@@ -1,21 +1,27 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import type { CookieOptions } from "@supabase/ssr";
+
+type CookieToSet = {
+  name: string;
+  value: string;
+  options?: CookieOptions;
+};
 
 /**
  * Next.js middleware — runs on every request before rendering.
  *
  * Protection rules:
  *   /admin/* → must be authenticated with a valid session
- *   /        → public (redirects to /admin if already logged in)
+ *   /        → public
  *   /login   → public (redirects to /admin if already logged in)
  *
  * Note: Supabase session refresh is handled here automatically.
- * The MFA AAL check is done at the API layer (backend) — middleware
- * only needs to verify a session exists.
  */
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  // Start with a response we can attach cookies to
+  let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,52 +31,49 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: CookieToSet[]) {
+          // Update the incoming request cookies (so downstream handlers see them)
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
+
+          // Recreate response so it carries updated request context
+          response = NextResponse.next({ request });
+
+          // Set cookies on the outgoing response
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
         },
       },
     }
   );
 
-  // Refresh session — IMPORTANT: always await this before reading session
-  const { data: { user } } = await supabase.auth.getUser();
+  // IMPORTANT: refresh session before checking user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
   // Protect /admin/* routes
-  if (pathname.startsWith('/admin')) {
+  if (pathname.startsWith("/admin")) {
     if (!user) {
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(loginUrl);
     }
-    // User is authenticated — let the page handle further checks
-    // (password change required, MFA setup required, etc.)
-    return supabaseResponse;
+    return response;
   }
 
   // Redirect authenticated users away from login
-  if (pathname === '/login' && user) {
-    return NextResponse.redirect(new URL('/admin', request.url));
+  if (pathname === "/login" && user) {
+    return NextResponse.redirect(new URL("/admin", request.url));
   }
 
-  return supabaseResponse;
+  return response;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico
-     * - /api/* (API routes handled separately)
-     * - /public/* paths
-     */
-    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    "/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
