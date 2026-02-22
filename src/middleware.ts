@@ -13,7 +13,6 @@ const PUBLIC_AUTH_PATHS = new Set([
   '/admin/change-password',
   '/admin/setup-mfa',
   '/admin/verify-mfa',
-  '/login',
 ]);
 
 export async function middleware(request: NextRequest) {
@@ -43,7 +42,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC_AUTH_PATHS.has(pathname)) {
-    if (user && (pathname === '/admin/login' || pathname === '/login')) {
+    if (user && pathname === '/admin/login') {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
     return supabaseResponse;
