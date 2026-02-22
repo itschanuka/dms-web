@@ -8,11 +8,12 @@ type CookieToSet = {
   options?: Parameters<NextResponse['cookies']['set']>[2];
 };
 
-const AUTH_PAGES = new Set([
+const PUBLIC_AUTH_PATHS = new Set([
+  '/admin/login',
+  '/admin/change-password',
+  '/admin/setup-mfa',
+  '/admin/verify-mfa',
   '/login',
-  '/change-password',
-  '/setup-mfa',
-  '/verify-mfa',
 ]);
 
 export async function middleware(request: NextRequest) {
@@ -29,7 +30,6 @@ export async function middleware(request: NextRequest) {
         setAll(cookiesToSet: CookieToSet[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
-
           cookiesToSet.forEach(({ name, value, options }) => {
             if (options) supabaseResponse.cookies.set(name, value, options);
             else supabaseResponse.cookies.set(name, value);
@@ -42,19 +42,16 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
-  // ✅ Allow auth pages always
-  if (AUTH_PAGES.has(pathname)) {
-    // optional: if logged in, keep them out of /login
-    if (pathname === '/login' && user) {
+  if (PUBLIC_AUTH_PATHS.has(pathname)) {
+    if (user && (pathname === '/admin/login' || pathname === '/login')) {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
     return supabaseResponse;
   }
 
-  // ✅ Protect /admin
   if (pathname.startsWith('/admin')) {
     if (!user) {
-      const loginUrl = new URL('/login', request.url);
+      const loginUrl = new URL('/admin/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }
