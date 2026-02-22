@@ -1,27 +1,29 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import type { CookieOptions } from "@supabase/ssr";
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 
 type CookieToSet = {
   name: string;
   value: string;
-  options?: CookieOptions;
+  options?: Parameters<NextResponse['cookies']['set']>[2];
 };
 
 /**
- * Next.js middleware — runs on every request before rendering.
+ * Next.js middleware
  *
- * Protection rules:
- *   /admin/* → must be authenticated with a valid session
- *   /        → public
- *   /login   → public (redirects to /admin if already logged in)
- *
- * Note: Supabase session refresh is handled here automatically.
+ * Route rules:
+ *   /            → Public home (always accessible)
+ *   /about       → Public about (always accessible)
+ *   /inventory/* → Public inventory (always accessible)
+ *   /contact     → Public contact (always accessible)
+ *   /login       → Staff login — redirect to /admin/dashboard if already authenticated
+ *   /verify-mfa  → MFA verify (public but only reachable after login)
+ *   /setup-mfa   → MFA setup (public but only reachable after login)
+ *   /change-password → Password change (public but only reachable after login)
+ *   /admin/*     → Requires valid Supabase session — redirects to /login if not
  */
 export async function middleware(request: NextRequest) {
-  // Start with a response we can attach cookies to
-  let response = NextResponse.next({ request });
+  let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,48 +34,47 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet: CookieToSet[]) {
-          // Update the incoming request cookies (so downstream handlers see them)
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
 
-          // Recreate response so it carries updated request context
-          response = NextResponse.next({ request });
+          supabaseResponse = NextResponse.next({ request });
 
-          // Set cookies on the outgoing response
           cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
+            if (options) supabaseResponse.cookies.set(name, value, options);
+            else supabaseResponse.cookies.set(name, value);
           });
         },
       },
     }
   );
 
-  // IMPORTANT: refresh session before checking user
+  // Refresh session — always await before reading user
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
-  // Protect /admin/* routes
-  if (pathname.startsWith("/admin")) {
+  // ── Admin routes: require authentication ─────────────────
+  if (pathname.startsWith('/admin')) {
     if (!user) {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", pathname);
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }
-    return response;
+    return supabaseResponse;
   }
 
-  // Redirect authenticated users away from login
-  if (pathname === "/login" && user) {
-    return NextResponse.redirect(new URL("/admin", request.url));
+  // ── Login page: redirect away if already authenticated ───
+  if (pathname === '/login' && user) {
+    return NextResponse.redirect(new URL('/admin/dashboard', request.url));
   }
 
-  return response;
+  // ── Everything else: public, pass through ────────────────
+  return supabaseResponse;
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
