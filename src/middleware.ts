@@ -8,11 +8,11 @@ type CookieToSet = {
   options?: Parameters<NextResponse['cookies']['set']>[2];
 };
 
-const ADMIN_AUTH_PAGES = new Set([
-  '/admin/login',
-  '/admin/change-password',
-  '/admin/setup-mfa',
-  '/admin/verify-mfa',
+const AUTH_PAGES = new Set([
+  '/login',
+  '/change-password',
+  '/setup-mfa',
+  '/verify-mfa',
 ]);
 
 export async function middleware(request: NextRequest) {
@@ -28,7 +28,6 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet: CookieToSet[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-
           supabaseResponse = NextResponse.next({ request });
 
           cookiesToSet.forEach(({ name, value, options }) => {
@@ -40,38 +39,28 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session (cookie-based)
   const { data: { user } } = await supabase.auth.getUser();
-
   const { pathname } = request.nextUrl;
 
-  // ✅ Protect /admin/* but allow the admin auth pages
-  if (pathname.startsWith('/admin')) {
-    // allow the auth pages to load even without a session
-    if (ADMIN_AUTH_PAGES.has(pathname)) {
-      // if already logged in, keep them out of login page
-      if (pathname === '/admin/login' && user) {
-        return NextResponse.redirect(new URL('/admin', request.url));
-      }
-      return supabaseResponse;
+  // ✅ Allow auth pages always
+  if (AUTH_PAGES.has(pathname)) {
+    // optional: if logged in, keep them out of /login
+    if (pathname === '/login' && user) {
+      return NextResponse.redirect(new URL('/admin', request.url));
     }
-
-    // everything else under /admin requires session
-    if (!user) {
-      const loginUrl = new URL('/admin/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
     return supabaseResponse;
   }
 
-  // ✅ Optional: if someone visits /login, send them to the real login page
-  if (pathname === '/login') {
-    return NextResponse.redirect(new URL('/admin/login', request.url));
+  // ✅ Protect /admin
+  if (pathname.startsWith('/admin')) {
+    if (!user) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    return supabaseResponse;
   }
 
-  // Public routes
   return supabaseResponse;
 }
 
