@@ -20,7 +20,7 @@ function VerifyMfaContent() {
 
   // Redirect back if no factorId
   useEffect(() => {
-    if (!factorId) router.replace('/login');
+    if (!factorId) router.replace('/admin/login');
   }, [factorId, router]);
 
   async function handleSubmit(e: FormEvent) {
@@ -114,7 +114,7 @@ function VerifyMfaContent() {
         </form>
 
         <button
-          onClick={() => router.push('/login')}
+          onClick={() => router.push('/admin/login')}
           style={{
             width: '100%',
             marginTop: 12,
@@ -176,3 +176,6 @@ function buttonStyle(disabled: boolean): React.CSSProperties {
     transition: 'background 0.15s',
   };
 }
+
+
+
