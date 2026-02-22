@@ -3,15 +3,10 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { changePassword } from '@/lib/auth';
-import { createClient } from "@/lib/supabase/client";
-
-// ✅ Set this based on your routing choice:
-// If your MFA page is /setup-mfa => keep false
-// If your MFA page is /admin/setup-mfa => set true
-const ADMIN_AUTH_ROUTES = false;
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string>('');
@@ -33,21 +28,17 @@ export default function ChangePasswordPage() {
 
     setError('');
     setLoading(true);
-    const supabase = createClient();
-const { data: { session } } = await supabase.auth.getSession();
 
-console.log("FRONTEND USER ID:", session?.user?.id);
     const result = await changePassword(newPassword);
 
     setLoading(false);
 
     if (result.success) {
-      // ✅ After password change, go to MFA setup
-      router.push(ADMIN_AUTH_ROUTES ? '/admin/setup-mfa' : '/setup-mfa');
+      // ✅ Your actual route exists here:
+      router.push('/admin/setup-mfa');
       return;
     }
 
-    // ✅ Show the real error
     setError(result.error || 'Failed to change password');
   }
 
@@ -97,8 +88,12 @@ console.log("FRONTEND USER ID:", session?.user?.id);
 
           {/* New password */}
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>New password</label>
+            <label style={labelStyle} htmlFor="new_password">
+              New password
+            </label>
             <input
+              id="new_password"
+              name="new_password"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -142,8 +137,12 @@ console.log("FRONTEND USER ID:", session?.user?.id);
 
           {/* Confirm password */}
           <div style={{ marginBottom: 24 }}>
-            <label style={labelStyle}>Confirm password</label>
+            <label style={labelStyle} htmlFor="confirm_password">
+              Confirm password
+            </label>
             <input
+              id="confirm_password"
+              name="confirm_password"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -151,8 +150,7 @@ console.log("FRONTEND USER ID:", session?.user?.id);
               placeholder="••••••••"
               style={{
                 ...inputStyle,
-                borderColor:
-                  confirmPassword.length > 0 ? (doMatch ? '#10b981' : '#ef4444') : '#1f2d45',
+                borderColor: confirmPassword.length > 0 ? (doMatch ? '#10b981' : '#ef4444') : '#1f2d45',
               }}
               autoComplete="new-password"
               disabled={loading}
