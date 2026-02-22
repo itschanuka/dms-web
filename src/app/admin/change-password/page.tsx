@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { changePassword } from '@/lib/auth';
+import { createClient } from "@/lib/supabase/client";
 
 // ✅ Set this based on your routing choice:
 // If your MFA page is /setup-mfa => keep false
@@ -32,7 +33,10 @@ export default function ChangePasswordPage() {
 
     setError('');
     setLoading(true);
+    const supabase = createClient();
+const { data: { session } } = await supabase.auth.getSession();
 
+console.log("FRONTEND USER ID:", session?.user?.id);
     const result = await changePassword(newPassword);
 
     setLoading(false);
