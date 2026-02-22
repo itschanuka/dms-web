@@ -95,8 +95,7 @@ export async function signIn(
 
     // TOTP is enrolled — sign out the password session and force MFA challenge
     // This ensures the user MUST verify their Google Authenticator code
-    await supabase.auth.signOut();
-    return { status: 'mfa_required', factorId: totpFactor.id };
+return { status: 'mfa_required', factorId: totpFactor.id };
   }
 
   return { status: 'error', error: 'Unexpected authentication state' };
