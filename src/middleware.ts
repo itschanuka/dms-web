@@ -8,20 +8,13 @@ type CookieToSet = {
   options?: Parameters<NextResponse['cookies']['set']>[2];
 };
 
-/**
- * Next.js middleware
- *
- * Route rules:
- *   /            → Public home (always accessible)
- *   /about       → Public about (always accessible)
- *   /inventory/* → Public inventory (always accessible)
- *   /contact     → Public contact (always accessible)
- *   /login       → Staff login — redirect to /admin/dashboard if already authenticated
- *   /verify-mfa  → MFA verify (public but only reachable after login)
- *   /setup-mfa   → MFA setup (public but only reachable after login)
- *   /change-password → Password change (public but only reachable after login)
- *   /admin/*     → Requires valid Supabase session — redirects to /login if not
- */
+const ADMIN_AUTH_PAGES = new Set([
+  '/admin/login',
+  '/admin/change-password',
+  '/admin/setup-mfa',
+  '/admin/verify-mfa',
+]);
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -47,29 +40,38 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session — always await before reading user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Refresh session (cookie-based)
+  const { data: { user } } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
-  // ── Admin routes: require authentication ─────────────────
+  // ✅ Protect /admin/* but allow the admin auth pages
   if (pathname.startsWith('/admin')) {
+    // allow the auth pages to load even without a session
+    if (ADMIN_AUTH_PAGES.has(pathname)) {
+      // if already logged in, keep them out of login page
+      if (pathname === '/admin/login' && user) {
+        return NextResponse.redirect(new URL('/admin', request.url));
+      }
+      return supabaseResponse;
+    }
+
+    // everything else under /admin requires session
     if (!user) {
-      const loginUrl = new URL('/login', request.url);
+      const loginUrl = new URL('/admin/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }
+
     return supabaseResponse;
   }
 
-  // ── Login page: redirect away if already authenticated ───
-  if (pathname === '/login' && user) {
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+  // ✅ Optional: if someone visits /login, send them to the real login page
+  if (pathname === '/login') {
+    return NextResponse.redirect(new URL('/admin/login', request.url));
   }
 
-  // ── Everything else: public, pass through ────────────────
+  // Public routes
   return supabaseResponse;
 }
 
