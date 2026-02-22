@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn } from '@/lib/auth';
 
-export default function LoginPage() {
+export default function AdminLoginPage() {
   const router = useRouter();
-  const [email,    setEmail]    = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error,    setError]    = useState('');
-  const [loading,  setLoading]  = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -21,26 +21,23 @@ export default function LoginPage() {
 
     switch (result.status) {
       case 'mfa_required':
-        // Has verified MFA — go verify TOTP code
-        router.push(`/verify-mfa?factorId=${result.factorId ?? ''}`);
+        router.push(`/admin/verify-mfa?factorId=${result.factorId ?? ''}`);
         break;
 
       case 'mfa_setup_required':
-        // First login or no MFA set up yet
-        router.push('/setup-mfa');
+        router.push('/admin/setup-mfa');
         break;
 
       case 'password_change_required':
-        // Must change temp password before anything else
-        router.push('/change-password');
+        router.push('/admin/change-password');
         break;
 
       case 'success':
-        // Authenticated without MFA (shouldn't happen in prod but handle gracefully)
         router.push('/admin');
         break;
 
       case 'error':
+      default:
         setError(result.error ?? 'Sign in failed. Check your credentials.');
         break;
     }
@@ -49,49 +46,48 @@ export default function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        {/* Logo / Brand */}
         <div style={{ marginBottom: 32 }}>
-          <div style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.15em',
-            textTransform: 'uppercase',
-            color: '#5c7090',
-            marginBottom: 8,
-          }}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase',
+              color: '#5c7090',
+              marginBottom: 8,
+            }}
+          >
             Dealership Management System
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#fff', margin: 0 }}>
-            Sign in
-          </h1>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#fff', margin: 0 }}>Sign in</h1>
           <p style={{ fontSize: 14, color: '#5c7090', marginTop: 6 }}>
             Enter your email and password to continue
           </p>
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* Error message */}
           {error && (
-            <div style={{
-              background: 'rgba(239,68,68,0.1)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              borderRadius: 8,
-              padding: '10px 14px',
-              marginBottom: 20,
-              fontSize: 13,
-              color: '#fca5a5',
-            }}>
+            <div
+              style={{
+                background: 'rgba(239,68,68,0.1)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                borderRadius: 8,
+                padding: '10px 14px',
+                marginBottom: 20,
+                fontSize: 13,
+                color: '#fca5a5',
+              }}
+            >
               {error}
             </div>
           )}
 
-          {/* Email */}
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Email address</label>
             <input
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
               placeholder="you@dealership.com"
@@ -100,13 +96,12 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Password */}
           <div style={{ marginBottom: 24 }}>
             <label style={labelStyle}>Password</label>
             <input
               type="password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
               placeholder="••••••••"
@@ -115,12 +110,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading || !email || !password}
-            style={buttonStyle(loading || !email || !password)}
-          >
+          <button type="submit" disabled={loading || !email || !password} style={buttonStyle(loading || !email || !password)}>
             {loading ? 'Signing in…' : 'Sign in →'}
           </button>
         </form>
@@ -132,8 +122,6 @@ export default function LoginPage() {
     </div>
   );
 }
-
-// ── Shared styles ─────────────────────────────────────────────
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
