@@ -13,6 +13,8 @@ const PUBLIC_AUTH_PATHS = new Set([
   '/admin/change-password',
   '/admin/setup-mfa',
   '/admin/verify-mfa',
+  '/admin/forgot-password',
+  '/admin/reset-password',
 ]);
 
 export async function middleware(request: NextRequest) {
