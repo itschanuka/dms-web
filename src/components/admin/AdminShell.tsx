@@ -26,10 +26,12 @@ const MODULES: NavModule[] = [
 ];
 
 interface Props {
-  children: React.ReactNode;
+  children:      React.ReactNode;
+  theme?:        'dark' | 'light';
+  onThemeToggle?: () => void;
 }
 
-export default function AdminShell({ children }: Props) {
+export default function AdminShell({ children, theme = 'dark', onThemeToggle }: Props) {
   const pathname   = usePathname();
   const router     = useRouter();
   const scrollRef  = useRef<HTMLDivElement>(null);
@@ -86,7 +88,7 @@ export default function AdminShell({ children }: Props) {
       display:       'flex',
       flexDirection: 'column',
       minHeight:     '100vh',
-      background:    '#070a12',
+      background:    theme === 'dark' ? '#070a12' : '#f0f4f8',
       fontFamily:    "'Geist', 'DM Sans', ui-sans-serif, system-ui, sans-serif",
     }}>
 
@@ -95,8 +97,8 @@ export default function AdminShell({ children }: Props) {
       ══════════════════════════════════════════════════════ */}
       <header style={{
         height:          52,
-        background:      '#0b0f1a',
-        borderBottom:    '1px solid #131b2e',
+        background:      theme === 'dark' ? '#0b0f1a' : '#ffffff',
+        borderBottom:    theme === 'dark' ? '1px solid #131b2e' : '1px solid #e2e8f0',
         display:         'flex',
         alignItems:      'center',
         justifyContent:  'space-between',
@@ -229,7 +231,7 @@ export default function AdminShell({ children }: Props) {
           MODULE NAV BAR — The separate navigation header
       ══════════════════════════════════════════════════════ */}
       <nav style={{
-        background:   '#0b0f1a',
+        background:   theme === 'dark' ? '#0b0f1a' : '#ffffff',
         borderBottom: scrolled ? '1px solid #1a2540' : '1px solid #0f1524',
         position:     'sticky',
         top:          52,
