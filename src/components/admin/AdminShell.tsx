@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 
 const NAV = [
   { href: '/admin/dashboard',  icon: '📊', label: 'Dashboard'  },
@@ -26,12 +26,14 @@ export default function AdminShell({ children }: Props) {
   const [userEmail,   setUserEmail]   = useState('');
 
   useEffect(() => {
+    const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
       setUserEmail(data.user?.email ?? '');
     });
   }, []);
 
   async function handleSignOut() {
+    const supabase = createClient();
     await supabase.auth.signOut();
     router.push('/admin/login');
   }
@@ -41,17 +43,17 @@ export default function AdminShell({ children }: Props) {
 
       {/* ── Sidebar ────────────────────────────────────────── */}
       <aside style={{
-        width:      240,
-        background: '#0d1117',
-        borderRight: '1px solid #1f2d45',
-        display:    'flex',
+        width:         240,
+        background:    '#0d1117',
+        borderRight:   '1px solid #1f2d45',
+        display:       'flex',
         flexDirection: 'column',
-        position:   'fixed',
-        top:        0,
-        left:       sidebarOpen ? 0 : -240,
-        height:     '100vh',
-        zIndex:     200,
-        transition: 'left 0.25s ease',
+        position:      'fixed',
+        top:           0,
+        left:          sidebarOpen ? 0 : -240,
+        height:        '100vh',
+        zIndex:        200,
+        transition:    'left 0.25s ease',
       }}
       className="admin-sidebar"
       >
@@ -84,19 +86,19 @@ export default function AdminShell({ children }: Props) {
                 href={link.href}
                 onClick={() => setSidebarOpen(false)}
                 style={{
-                  display:      'flex',
-                  alignItems:   'center',
-                  gap:          10,
-                  padding:      '9px 12px',
-                  borderRadius: 8,
-                  fontSize:     13,
-                  fontWeight:   isActive ? 700 : 500,
-                  color:        isActive ? '#fff' : '#8097b8',
-                  background:   isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
+                  display:        'flex',
+                  alignItems:     'center',
+                  gap:            10,
+                  padding:        '9px 12px',
+                  borderRadius:   8,
+                  fontSize:       13,
+                  fontWeight:     isActive ? 700 : 500,
+                  color:          isActive ? '#fff' : '#8097b8',
+                  background:     isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
                   textDecoration: 'none',
-                  marginBottom: 2,
-                  transition:   'all 0.15s',
-                  borderLeft:   isActive ? '3px solid #6366f1' : '3px solid transparent',
+                  marginBottom:   2,
+                  transition:     'all 0.15s',
+                  borderLeft:     isActive ? '3px solid #6366f1' : '3px solid transparent',
                 }}
               >
                 <span style={{ fontSize: 16 }}>{link.icon}</span>
@@ -141,16 +143,16 @@ export default function AdminShell({ children }: Props) {
 
         {/* Top bar */}
         <header style={{
-          height:      56,
-          background:  '#0d1117',
-          borderBottom: '1px solid #1f2d45',
-          display:     'flex',
-          alignItems:  'center',
+          height:         56,
+          background:     '#0d1117',
+          borderBottom:   '1px solid #1f2d45',
+          display:        'flex',
+          alignItems:     'center',
           justifyContent: 'space-between',
-          padding:     '0 20px',
-          position:    'sticky',
-          top:         0,
-          zIndex:      100,
+          padding:        '0 20px',
+          position:       'sticky',
+          top:            0,
+          zIndex:         100,
         }}>
           {/* Mobile hamburger */}
           <button

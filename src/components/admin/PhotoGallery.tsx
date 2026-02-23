@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { supabase } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 import { adminApi } from '@/lib/api';
 
 interface Doc {
@@ -43,6 +43,8 @@ export default function PhotoGallery({ vehicleId, stockId, canEdit }: Props) {
     if (!files || files.length === 0) return;
     setUploading(true);
     setError('');
+
+    const supabase = createClient();
 
     for (const file of Array.from(files)) {
       try {
@@ -170,7 +172,6 @@ export default function PhotoGallery({ vehicleId, stockId, canEdit }: Props) {
                 <Image src={photo.file_url} alt={photo.file_name} fill style={{ objectFit: 'cover' }} unoptimized />
               </div>
 
-              {/* Main badge */}
               {photo.is_main_image && (
                 <div style={{
                   position: 'absolute', top: 6, left: 6,
@@ -181,7 +182,6 @@ export default function PhotoGallery({ vehicleId, stockId, canEdit }: Props) {
                 </div>
               )}
 
-              {/* Actions */}
               {canEdit && (
                 <div style={{ display: 'flex', gap: 4, padding: '6px 8px', background: '#0d1117', justifyContent: 'space-between' }}>
                   {!photo.is_main_image && (
