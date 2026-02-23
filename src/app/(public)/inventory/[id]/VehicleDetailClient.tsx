@@ -30,11 +30,10 @@ export default function VehicleDetailClient({ vehicle }: Props) {
 
   const title = `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.variant ? ' ' + vehicle.variant : ''}`;
   const waMessage = encodeURIComponent(
-    `Hi, I'm interested in the ${title} (Stock: ${vehicle.stock_id}) listed at ${formatPrice(vehicle.asking_price)}. Is it still available?`
+    `Hi, I'm interested in the ${title} listed at ${formatPrice(vehicle.asking_price)}. Is it still available?`
   );
 
   const specs: Array<{ label: string; value: string }> = [
-    { label: 'Stock ID',      value: vehicle.stock_id },
     { label: 'Condition',     value: formatCondition(vehicle.condition) },
     { label: 'Year',          value: String(vehicle.year) },
     { label: 'Mileage',       value: formatMileage(vehicle.mileage) },
@@ -159,7 +158,6 @@ export default function VehicleDetailClient({ vehicle }: Props) {
         <div style={{ position: 'sticky', top: 80 }}>
           {/* Title & price */}
           <div style={{ background: '#0d1117', border: '1px solid #1f2d45', borderRadius: 14, padding: '24px', marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: '#5c7090', fontWeight: 600, marginBottom: 4 }}>{vehicle.stock_id}</div>
             <h1 style={{ fontSize: 'clamp(20px, 3vw, 26px)', fontWeight: 900, color: '#fff', margin: '0 0 6px', lineHeight: 1.2 }}>
               {title}
             </h1>
