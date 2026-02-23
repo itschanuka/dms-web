@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTheme } from '@/lib/theme';
 import AdminShell from '@/components/admin/AdminShell';
 import Link from 'next/link';
 import { adminApi, type AdminVehicle } from '@/lib/api';
 import { formatPrice } from '@/lib/formatters';
-
-type Theme = 'dark' | 'light';
 
 // ── Decorative car SVG — purely visual, zero data ─────────────
 function CarSilhouette({ color, style }: { color: string; style?: React.CSSProperties }) {
@@ -56,17 +55,13 @@ const MODULES = [
 
 // ── Dashboard ─────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const [theme,   setTheme]   = useState<Theme>('dark');
+  const { toggleTheme, isDark } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [stats,   setStats]   = useState<InventoryStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
 
-  useEffect(() => {
-    setMounted(true);
-    const saved = localStorage.getItem('dms_theme') as Theme | null;
-    if (saved) setTheme(saved);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   // ── Real API call — inventory is the only built module so far ──
   useEffect(() => {
@@ -95,13 +90,7 @@ export default function AdminDashboard() {
     void load();
   }, []);
 
-  function toggleTheme() {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    localStorage.setItem('dms_theme', next);
-  }
-
-  const dk = theme === 'dark';
+  const dk = isDark;
   const t = {
     bg:        dk ? '#070a12' : '#dde6f0',
     bgCard:    dk ? '#0d1525' : '#e8f0f9',
@@ -123,7 +112,7 @@ export default function AdminDashboard() {
   ] : [];
 
   return (
-    <AdminShell theme={theme} onThemeToggle={toggleTheme}>
+    <AdminShell>
       <div style={{ background: t.bg, minHeight: '100vh', paddingBottom: 60, transition: 'background 0.3s' }}>
 
         {/* ── Hero ─────────────────────────────────────────────── */}
