@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import PublicHeader from '@/components/public/PublicHeader';
+import PublicFooter from '@/components/public/PublicFooter';
 import { DEALERSHIP } from '@/lib/constants';
 
 export const metadata: Metadata = {
