@@ -69,18 +69,33 @@ export default function PhotoGallery({ vehicleId, stockId, canEdit }: Props) {
       try {
         // 1. Upload to Supabase Storage
         const ext  = file.name.split('.').pop() ?? 'bin';
-        const path = `vehicles/${stockId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        // Photos go into the public vehicle-media bucket.
+        // Documents go into a separate private path so they're never
+        // accidentally exposed via public URL policies.
+        const isPhoto  = activeType === 'photo';
+        const bucket   = isPhoto ? 'vehicle-media' : 'customer-docs';
+        const path     = `vehicles/${stockId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('vehicle-media')
+          .from(bucket)
           .upload(path, file, { upsert: false });
 
         if (uploadError) throw uploadError;
 
-        // 2. Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('vehicle-media')
-          .getPublicUrl(path);
+        // 2. Get URL — private docs use a signed URL (1 year), photos use public URL
+        let fileUrl: string;
+        if (isPhoto) {
+          const { data: { publicUrl } } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(path);
+          fileUrl = publicUrl;
+        } else {
+          const { data: signedData, error: signErr } = await supabase.storage
+            .from(bucket)
+            .createSignedUrl(path, 60 * 60 * 24 * 365); // 1 year
+          if (signErr || !signedData) throw signErr ?? new Error('Failed to get signed URL');
+          fileUrl = signedData.signedUrl;
+        }
 
         // 3. Register in DB via API
         const existingPhotos = docs.filter(d => d.doc_type === 'photo');
@@ -88,7 +103,7 @@ export default function PhotoGallery({ vehicleId, stockId, canEdit }: Props) {
         const finalDocType = activeType === 'photo' ? 'photo' : docType;
 
         await adminApi.addDocument(vehicleId, {
-          file_url:      publicUrl,
+          file_url:      fileUrl,
           file_name:     file.name,
           file_size:     file.size,
           doc_type:      finalDocType,
@@ -165,7 +180,7 @@ export default function PhotoGallery({ vehicleId, stockId, canEdit }: Props) {
               ref={fileRef}
               type="file"
               multiple={activeType === 'photo'}
-              accept={activeType === 'photo' ? 'image/*' : '*'}
+              accept={activeType === 'photo' ? 'image/*' : undefined}
               style={{ display: 'none' }}
               onChange={e => void handleUpload(e.target.files)}
             />

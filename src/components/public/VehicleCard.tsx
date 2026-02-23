@@ -69,20 +69,7 @@ export default function VehicleCard({ vehicle }: VehicleCardProps) {
             {formatCondition(vehicle.condition).toUpperCase()}
           </div>
 
-          {/* Stock ID */}
-          <div style={{
-            position:   'absolute',
-            top:        10,
-            right:      10,
-            background: 'rgba(0,0,0,0.6)',
-            color:      '#8097b8',
-            fontSize:   10,
-            fontWeight: 600,
-            padding:    '3px 8px',
-            borderRadius: 6,
-          }}>
-            {vehicle.stock_id}
-          </div>
+
         </div>
 
         {/* Info */}
