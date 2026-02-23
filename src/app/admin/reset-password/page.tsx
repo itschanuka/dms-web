@@ -39,13 +39,39 @@ function ResetPasswordContent() {
     setError('');
     setLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    setLoading(false);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
 
-    if (error) { setError(error.message); return; }
-    setDone(true);
-    setTimeout(() => router.push('/admin/login'), 2500);
+      if (!session) {
+        setError('Session expired. Please request a new reset link.');
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ new_password: newPassword }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        setError(json?.error?.message || json?.message || 'Reset failed. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      setDone(true);
+      setTimeout(() => router.push('/admin/login'), 2500);
+    } catch (err: any) {
+      setError(err?.message || 'Network error. Please try again.');
+      setLoading(false);
+    }
   }
 
   if (checking) {
@@ -85,7 +111,16 @@ function ResetPasswordContent() {
 
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>New password</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required placeholder="••••••••" style={inputStyle} disabled={loading || !validSession} autoComplete="new-password" />
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+              style={inputStyle}
+              disabled={loading || !validSession}
+              autoComplete="new-password"
+            />
           </div>
 
           {newPassword.length > 0 && (
@@ -101,13 +136,36 @@ function ResetPasswordContent() {
 
           <div style={{ marginBottom: 24 }}>
             <label style={labelStyle}>Confirm password</label>
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required placeholder="••••••••" style={{ ...inputStyle, borderColor: confirmPassword.length > 0 ? (doMatch ? '#10b981' : '#ef4444') : '#1f2d45' }} disabled={loading || !validSession} autoComplete="new-password" />
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+              style={{ ...inputStyle, borderColor: confirmPassword.length > 0 ? (doMatch ? '#10b981' : '#ef4444') : '#1f2d45' }}
+              disabled={loading || !validSession}
+              autoComplete="new-password"
+            />
             {confirmPassword.length > 0 && !doMatch && (
               <p style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>Passwords don&apos;t match</p>
             )}
           </div>
 
-          <button type="submit" disabled={!canSubmit} style={{ width: '100%', background: canSubmit ? '#6366f1' : '#1f2d45', color: canSubmit ? '#fff' : '#3a4e6a', border: 'none', borderRadius: 8, padding: '12px 20px', fontSize: 14, fontWeight: 700, cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            style={{
+              width: '100%',
+              background: canSubmit ? '#6366f1' : '#1f2d45',
+              color: canSubmit ? '#fff' : '#3a4e6a',
+              border: 'none',
+              borderRadius: 8,
+              padding: '12px 20px',
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
+            }}
+          >
             {loading ? 'Saving…' : 'Set new password →'}
           </button>
         </form>
