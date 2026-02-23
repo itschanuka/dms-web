@@ -8,12 +8,288 @@ import { adminApi, type AdminVehicle, type Pagination } from '@/lib/api';
 import { formatPrice, formatMileage } from '@/lib/formatters';
 import { useTheme } from '@/lib/theme';
 
+// ── Aging colour map ───────────────────────────────────────────
 const AGING_COLORS: Record<string, string> = {
   fresh:      '#10b981',
   aging:      '#f59e0b',
   old:        '#ef4444',
   dead_stock: '#dc2626',
 };
+
+// ── Date preset helpers ────────────────────────────────────────
+function toDateStr(d: Date) {
+  return d.toISOString().split('T')[0]!;
+}
+
+function getPresetRange(preset: string): { from: string; to: string } {
+  const today = new Date();
+  const to    = toDateStr(today);
+  switch (preset) {
+    case 'today': {
+      return { from: to, to };
+    }
+    case 'week': {
+      const d = new Date(today); d.setDate(d.getDate() - 6);
+      return { from: toDateStr(d), to };
+    }
+    case 'month': {
+      return { from: `${to.slice(0, 7)}-01`, to };
+    }
+    case '3months': {
+      const d = new Date(today); d.setMonth(d.getMonth() - 3);
+      return { from: toDateStr(d), to };
+    }
+    case 'year': {
+      return { from: `${today.getFullYear()}-01-01`, to };
+    }
+    default:
+      return { from: `${to.slice(0, 7)}-01`, to };
+  }
+}
+
+// ── Mini bar chart (pure CSS) ───────────────────────────────────
+function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.max(4, (value / max) * 100) : 0;
+  return (
+    <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden', marginTop: 4 }}>
+      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.4s ease' }} />
+    </div>
+  );
+}
+
+// ── Trend spark bars ───────────────────────────────────────────
+function SparkBars({ data, field, color }: { data: Array<{ month: string; added: number; sold: number }>; field: 'added' | 'sold'; color: string }) {
+  const max = Math.max(...data.map(d => d[field]), 1);
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 36 }}>
+      {data.slice(-12).map(d => {
+        const h = Math.max(2, (d[field] / max) * 36);
+        return (
+          <div key={d.month} title={`${d.month}: ${d[field]}`} style={{
+            flex: 1, height: h, background: color, borderRadius: '2px 2px 0 0',
+            opacity: 0.7, transition: 'height 0.3s',
+          }} />
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Analytics panel ────────────────────────────────────────────
+
+type AnalyticsData = Awaited<ReturnType<typeof adminApi.getAnalytics>>;
+
+const PRESETS = [
+  { key: 'today',   label: 'Today'      },
+  { key: 'week',    label: 'This Week'  },
+  { key: 'month',   label: 'This Month' },
+  { key: '3months', label: 'Last 3 Mo'  },
+  { key: 'year',    label: 'This Year'  },
+];
+
+function AnalyticsPanel({ isDark }: { isDark: boolean }) {
+  const [preset,   setPreset]   = useState('month');
+  const [data,     setData]     = useState<AnalyticsData | null>(null);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState('');
+  const [open,     setOpen]     = useState(true);
+
+  const c = {
+    panelBg:  isDark ? '#0d1525' : '#ddeaf8',
+    cardBg:   isDark ? '#111827' : '#e8f2fb',
+    border:   isDark ? '#1f2d45' : '#b2c4d8',
+    text:     isDark ? '#e8f0fc' : '#0f1e32',
+    sub:      isDark ? '#5c7090' : '#4a6278',
+    muted:    isDark ? '#3d5270' : '#7a96b0',
+  };
+
+  const load = useCallback(async (p: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const range = getPresetRange(p);
+      const result = await adminApi.getAnalytics(range.from, range.to);
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load analytics');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(preset); }, [preset, load]);
+
+  const ag = data?.agingBreakdown ?? { fresh: 0, aging: 0, old: 0, dead_stock: 0 };
+  const maxAging = Math.max(ag.fresh, ag.aging, ag.old, ag.dead_stock, 1);
+
+  return (
+    <div style={{ background: c.panelBg, border: `1px solid ${c.border}`, borderRadius: 12, marginBottom: 20, overflow: 'hidden', transition: 'background 0.25s' }}>
+      {/* Panel header */}
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', cursor: 'pointer', borderBottom: open ? `1px solid ${c.border}` : 'none' }}
+        onClick={() => setOpen(o => !o)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 15, fontWeight: 800, color: c.text }}>📊 Analytics</span>
+          {data && (
+            <span style={{ fontSize: 11, color: c.sub, fontWeight: 500 }}>
+              {data.totalVehicles} vehicles total · {data.availableCount} available
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: 12, color: c.muted }}>{open ? '▲' : '▼'}</span>
+      </div>
+
+      {open && (
+        <div style={{ padding: '16px 18px' }}>
+          {/* Preset tabs */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
+            {PRESETS.map(p => (
+              <button
+                key={p.key}
+                onClick={() => setPreset(p.key)}
+                style={{
+                  padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  background: preset === p.key ? '#6366f1' : 'transparent',
+                  border:     preset === p.key ? '1px solid #6366f1' : `1px solid ${c.border}`,
+                  color:      preset === p.key ? '#fff' : c.sub,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+            {data && (
+              <span style={{ fontSize: 11, color: c.muted, alignSelf: 'center', marginLeft: 4 }}>
+                {data.period.from} → {data.period.to}
+              </span>
+            )}
+          </div>
+
+          {error && (
+            <div style={{ fontSize: 12, color: '#ef4444', marginBottom: 12 }}>⚠️ {error}</div>
+          )}
+
+          {loading ? (
+            <div style={{ fontSize: 13, color: c.sub, padding: '20px 0' }}>Loading analytics…</div>
+          ) : data && (
+            <div>
+              {/* ── Row 1: Period KPIs ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 16 }}>
+                {[
+                  { label: 'Added This Period',  value: data.addedInPeriod,                         color: '#818cf8', fmt: (n: number) => String(n) },
+                  { label: 'Sold This Period',   value: data.soldInPeriod,                           color: '#10b981', fmt: (n: number) => String(n) },
+                  { label: 'Revenue This Period',value: data.revenueInPeriod,                        color: '#34d399', fmt: formatPrice },
+                  { label: 'Profit This Period', value: data.profitInPeriod,                         color: data.profitInPeriod >= 0 ? '#10b981' : '#ef4444', fmt: formatPrice },
+                ].map(kpi => (
+                  <div key={kpi.label} style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '13px 15px' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: c.sub, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>
+                      {kpi.label}
+                    </div>
+                    <div style={{ fontSize: 17, fontWeight: 900, color: kpi.color }}>
+                      {kpi.fmt(kpi.value)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Row 2: Live inventory snapshot + aging ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+                {/* Inventory snapshot */}
+                <div style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '13px 15px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: c.sub, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10 }}>
+                    Live Inventory Value
+                  </div>
+                  {[
+                    { label: 'Total Asking', value: data.inventoryValue,    color: '#fff'     },
+                    { label: 'Cost Basis',   value: data.inventoryCostBase, color: '#f59e0b'  },
+                    { label: 'Est. Profit',  value: data.inventoryProfit,   color: data.inventoryProfit >= 0 ? '#10b981' : '#ef4444' },
+                  ].map(row => (
+                    <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 7, marginBottom: 7, borderBottom: `1px solid ${c.border}`, fontSize: 12 }}>
+                      <span style={{ color: c.sub }}>{row.label}</span>
+                      <span style={{ fontWeight: 700, color: row.color }}>{formatPrice(row.value)}</span>
+                    </div>
+                  ))}
+
+                  {/* Status breakdown */}
+                  <div style={{ fontSize: 10, fontWeight: 700, color: c.muted, letterSpacing: '0.07em', textTransform: 'uppercase', marginTop: 12, marginBottom: 8 }}>By Status</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {Object.entries(data.statusCounts).map(([status, count]) => (
+                      <span key={status} style={{
+                        fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4,
+                        background: 'rgba(99,102,241,0.12)', color: '#818cf8',
+                      }}>
+                        {status}: {count}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Aging breakdown */}
+                <div style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '13px 15px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: c.sub, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10 }}>
+                    Stock Aging (Available)
+                  </div>
+                  {([
+                    { key: 'fresh',      label: 'Fresh (0–30d)',     color: '#10b981' },
+                    { key: 'aging',      label: 'Aging (31–60d)',    color: '#f59e0b' },
+                    { key: 'old',        label: 'Old (61–90d)',      color: '#ef4444' },
+                    { key: 'dead_stock', label: 'Dead Stock (90d+)', color: '#dc2626' },
+                  ] as const).map(row => (
+                    <div key={row.key} style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                        <span style={{ color: c.sub }}>{row.label}</span>
+                        <span style={{ fontWeight: 700, color: row.color }}>{ag[row.key]}</span>
+                      </div>
+                      <MiniBar value={ag[row.key]} max={maxAging} color={row.color} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Row 3: Monthly trend bars ── */}
+              {data.monthlyTrend.length > 0 && (
+                <div style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '13px 15px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: c.sub, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+                      12-Month Trend
+                    </div>
+                    <div style={{ display: 'flex', gap: 14, fontSize: 10, color: c.muted }}>
+                      <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#818cf8', marginRight: 4 }} />Added</span>
+                      <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#10b981', marginRight: 4 }} />Sold</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: c.muted, marginBottom: 4 }}>Vehicles Added</div>
+                      <SparkBars data={data.monthlyTrend} field="added" color="#818cf8" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: c.muted, marginBottom: 4 }}>Vehicles Sold</div>
+                      <SparkBars data={data.monthlyTrend} field="sold" color="#10b981" />
+                    </div>
+                  </div>
+                  {/* Month labels */}
+                  <div style={{ display: 'flex', gap: 2, marginTop: 4 }}>
+                    {data.monthlyTrend.slice(-12).map(d => (
+                      <div key={d.month} style={{ flex: 1, fontSize: 8, color: c.muted, textAlign: 'center' }}>
+                        {d.month.slice(5)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN INVENTORY PAGE
+// ═══════════════════════════════════════════════════════════════
 
 export default function InventoryListPage() {
   const { isDark } = useTheme();
@@ -27,36 +303,27 @@ export default function InventoryListPage() {
   const [website,    setWebsite]    = useState('');
   const [page,       setPage]       = useState(1);
 
-  // ── Color tokens ──────────────────────────────────────────
   const c = {
     pageBg:      isDark ? '#141c2e' : '#dde6f0',
     cardBg:      isDark ? '#1a2236' : '#e8f2fb',
     filterBg:    isDark ? '#1e2840' : '#ddeaf8',
     border:      isDark ? '#243048' : '#b2c4d8',
     borderLight: isDark ? '#1e2a3e' : '#c8d8e8',
-    // Text
-    textPrimary: isDark ? '#e8f0fc' : '#0f1e32',   // headings, key values — max contrast
-    textBody:    isDark ? '#b8cce0' : '#243650',   // normal body text
-    textSub:     isDark ? '#6b82a0' : '#4a6278',   // labels, subtitles
-    textMuted:   isDark ? '#3d5270' : '#7a96b0',   // hints, placeholders
-    // Inputs
+    textPrimary: isDark ? '#e8f0fc' : '#0f1e32',
+    textBody:    isDark ? '#b8cce0' : '#243650',
+    textSub:     isDark ? '#6b82a0' : '#4a6278',
+    textMuted:   isDark ? '#3d5270' : '#7a96b0',
     inputBg:     isDark ? '#111827' : '#d8e8f4',
     inputText:   isDark ? '#d0dff0' : '#1a2c42',
     inputBorder: isDark ? '#243048' : '#a8bed4',
-    // Row hover
     rowHover:    isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
-    // Accent stock ID color
     stockId:     isDark ? '#818cf8' : '#4f46e5',
   };
 
   const INPUT: React.CSSProperties = {
-    background: c.inputBg,
-    border:     `1px solid ${c.inputBorder}`,
-    borderRadius: 7,
-    padding:    '7px 11px',
-    fontSize:   13,
-    color:      c.inputText,
-    outline:    'none',
+    background: c.inputBg, border: `1px solid ${c.inputBorder}`,
+    borderRadius: 7, padding: '7px 11px', fontSize: 13,
+    color: c.inputText, outline: 'none',
   };
   const SELECT: React.CSSProperties = { ...INPUT, appearance: 'none', cursor: 'pointer', paddingRight: 24 };
 
@@ -89,7 +356,7 @@ export default function InventoryListPage() {
       <div style={{ padding: '28px', background: c.pageBg, minHeight: '100%', transition: 'background 0.25s' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 900, color: c.textPrimary, margin: 0, letterSpacing: '-0.4px' }}>
               Inventory
@@ -110,6 +377,9 @@ export default function InventoryListPage() {
           </Link>
         </div>
 
+        {/* ── Analytics panel ── */}
+        <AnalyticsPanel isDark={isDark} />
+
         {/* Filters */}
         <div style={{ background: c.filterBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '14px 16px', marginBottom: 20, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', transition: 'background 0.25s' }}>
           <input
@@ -119,9 +389,9 @@ export default function InventoryListPage() {
           />
 
           {[
-            { value: status,  onChange: setStatus,  options: [['', 'All Statuses'], ['draft','Draft'], ['available','Available'], ['reserved','Reserved'], ['sold','Sold'], ['written_off','Written Off']] },
-            { value: aging,   onChange: setAging,   options: [['', 'All Ages'], ['fresh','Fresh (0–30d)'], ['aging','Aging (31–60d)'], ['old','Old (61–90d)'], ['dead_stock','Dead Stock (90d+)']] },
-            { value: website, onChange: setWebsite, options: [['', 'Website: All'], ['true','Website: Visible'], ['false','Website: Hidden']] },
+            { value: status,  onChange: setStatus,  options: [['', 'All Statuses'], ['draft','Draft'], ['available','Available'], ['reserved','Reserved'], ['sold','Sold'], ['written_off','Written Off']] as [string,string][] },
+            { value: aging,   onChange: setAging,   options: [['', 'All Ages'], ['fresh','Fresh (0–30d)'], ['aging','Aging (31–60d)'], ['old','Old (61–90d)'], ['dead_stock','Dead Stock (90d+)']] as [string,string][] },
+            { value: website, onChange: setWebsite, options: [['', 'Website: All'], ['true','Website: Visible'], ['false','Website: Hidden']] as [string,string][] },
           ].map((f, i) => (
             <div key={i} style={{ position: 'relative' }}>
               <select value={f.value} onChange={e => f.onChange(e.target.value)} style={SELECT}>
@@ -225,7 +495,6 @@ export default function InventoryListPage() {
               background: c.cardBg, border: `1px solid ${c.border}`,
               color: pagination.hasPrev ? c.textBody : c.textMuted,
               cursor: pagination.hasPrev ? 'pointer' : 'not-allowed',
-              transition: 'all 0.15s',
             }}>← Prev</button>
             <span style={{ fontSize: 12, color: c.textSub }}>Page {page} of {pagination.totalPages}</span>
             <button onClick={() => void load(page + 1)} disabled={!pagination.hasNext} style={{
@@ -233,7 +502,6 @@ export default function InventoryListPage() {
               background: c.cardBg, border: `1px solid ${c.border}`,
               color: pagination.hasNext ? c.textBody : c.textMuted,
               cursor: pagination.hasNext ? 'pointer' : 'not-allowed',
-              transition: 'all 0.15s',
             }}>Next →</button>
           </div>
         )}

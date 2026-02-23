@@ -258,6 +258,28 @@ export const adminApi = {
   deleteVehicle: (id: string) =>
     adminFetch<{ message: string }>(`/inventory/${id}`, { method: 'DELETE' }),
 
+  // ── Analytics ─────────────────────────────────────────────
+
+  getAnalytics: (from: string, to: string) => {
+    const qs = new URLSearchParams({ from, to });
+    return adminFetch<{
+      period:           { from: string; to: string };
+      totalVehicles:    number;
+      statusCounts:     Record<string, number>;
+      availableCount:   number;
+      inventoryValue:   number;
+      inventoryCostBase: number;
+      inventoryProfit:  number;
+      addedInPeriod:    number;
+      soldInPeriod:     number;
+      revenueInPeriod:  number;
+      costInPeriod:     number;
+      profitInPeriod:   number;
+      agingBreakdown:   { fresh: number; aging: number; old: number; dead_stock: number };
+      monthlyTrend:     Array<{ month: string; added: number; sold: number }>;
+    }>(`/inventory/analytics?${qs.toString()}`);
+  },
+
   // ── Costs ─────────────────────────────────────────────────
 
   getCosts: (vehicleId: string) =>
