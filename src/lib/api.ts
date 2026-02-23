@@ -108,11 +108,11 @@ export interface AdminVehicle {
 export interface VehicleCost {
   id:          string;
   vehicle_id:  string;
-  cost_type:   string;
+  cost_date:   string;
+  category:    string;
   description: string;
   amount:      number;
-  paid_date:   string | null;
-  supplier:    string | null;
+  created_by:  string;
   created_at:  string;
 }
 

@@ -6,11 +6,11 @@ import { formatPrice } from '@/lib/formatters';
 
 interface Cost {
   id:          string;
-  cost_type:   string;
+  category:    string;
   description: string;
   amount:      number;
-  paid_date:   string | null;
-  supplier:    string | null;
+  cost_date:   string;
+  created_at:  string;
 }
 
 interface Props {
@@ -18,9 +18,16 @@ interface Props {
   canEdit:    boolean;
 }
 
-const COST_TYPES = [
-  'purchase', 'repair', 'service', 'inspection', 'shipping',
-  'registration', 'insurance', 'cleaning', 'parts', 'other',
+// Must match the API costSchema enum exactly
+const COST_CATEGORIES: { value: string; label: string }[] = [
+  { value: 'repair',              label: 'Repair'               },
+  { value: 'spare_parts',         label: 'Spare Parts'          },
+  { value: 'paint_bodywork',      label: 'Paint & Bodywork'     },
+  { value: 'service',             label: 'Service'              },
+  { value: 'transport',           label: 'Transport'            },
+  { value: 'auction_import_fees', label: 'Auction / Import Fees'},
+  { value: 'advertising',         label: 'Advertising'          },
+  { value: 'other',               label: 'Other'                },
 ];
 
 const INPUT: React.CSSProperties = {
@@ -29,19 +36,28 @@ const INPUT: React.CSSProperties = {
   color: '#dde4f0', outline: 'none', boxSizing: 'border-box',
 };
 
+function todayStr() {
+  return new Date().toISOString().split('T')[0]!;
+}
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 export default function CostTable({ vehicleId, canEdit }: Props) {
-  const [costs,   setCosts]   = useState<Cost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [costs,    setCosts]    = useState<Cost[]>([]);
+  const [loading,  setLoading]  = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editId,  setEditId]  = useState<string | null>(null);
-  const [saving,  setSaving]  = useState(false);
-  const [error,   setError]   = useState('');
+  const [editId,   setEditId]   = useState<string | null>(null);
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState('');
 
   const [form, setForm] = useState({
-    cost_type:   'repair',
+    category:    'repair',
     description: '',
     amount:      '',
-    paid_date:   '',
+    cost_date:   todayStr(),
     supplier:    '',
   });
 
@@ -51,13 +67,13 @@ export default function CostTable({ vehicleId, canEdit }: Props) {
     setLoading(true);
     try {
       const data = await adminApi.getCosts(vehicleId);
-      setCosts(data);
+      setCosts(data as unknown as Cost[]);
     } catch { /* silently fail */ }
     finally { setLoading(false); }
   }
 
   function resetForm() {
-    setForm({ cost_type: 'repair', description: '', amount: '', paid_date: '', supplier: '' });
+    setForm({ category: 'repair', description: '', amount: '', cost_date: todayStr(), supplier: '' });
     setEditId(null);
     setShowForm(false);
     setError('');
@@ -65,27 +81,39 @@ export default function CostTable({ vehicleId, canEdit }: Props) {
 
   function startEdit(cost: Cost) {
     setForm({
-      cost_type:   cost.cost_type,
+      category:    cost.category,
       description: cost.description,
       amount:      String(cost.amount),
-      paid_date:   cost.paid_date ?? '',
-      supplier:    cost.supplier  ?? '',
+      cost_date:   cost.cost_date ? cost.cost_date.split('T')[0]! : todayStr(),
+      supplier:    '',
     });
     setEditId(cost.id);
     setShowForm(true);
   }
 
   async function handleSubmit() {
-    if (!form.description || !form.amount) { setError('Description and amount are required'); return; }
+    const desc = form.description.trim();
+    const amt  = parseFloat(form.amount);
+
+    if (!desc)              { setError('Description is required');          return; }
+    if (!form.amount)       { setError('Amount is required');               return; }
+    if (isNaN(amt)||amt<=0) { setError('Amount must be a positive number'); return; }
+    if (!form.cost_date)    { setError('Date is required');                 return; }
+
     setSaving(true);
     setError('');
+
+    // Supplier has no separate DB column — embed it into description
+    const finalDesc = form.supplier.trim()
+      ? `${desc} — Supplier: ${form.supplier.trim()}`
+      : desc;
+
     try {
       const payload = {
-        cost_type:   form.cost_type,
-        description: form.description,
-        amount:      parseFloat(form.amount),
-        paid_date:   form.paid_date   || undefined,
-        supplier:    form.supplier    || undefined,
+        category:    form.category,
+        description: finalDesc,
+        amount:      amt,
+        cost_date:   form.cost_date,
       };
       if (editId) {
         await adminApi.updateCost(vehicleId, editId, payload);
@@ -95,17 +123,17 @@ export default function CostTable({ vehicleId, canEdit }: Props) {
       await loadCosts();
       resetForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
+      setError(err instanceof Error ? err.message : 'Failed to save cost entry');
     } finally {
       setSaving(false);
     }
   }
 
-  const total = costs.reduce((sum, c) => sum + c.amount, 0);
+  const total = costs.reduce((sum, c) => sum + Number(c.amount), 0);
 
   return (
     <div>
-      {/* Header row */}
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
           <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Cost Entries</span>
@@ -124,40 +152,86 @@ export default function CostTable({ vehicleId, canEdit }: Props) {
         )}
       </div>
 
-      {/* Add/Edit form */}
+      {/* Form */}
       {showForm && canEdit && (
         <div style={{ background: '#111827', border: '1px solid #1f2d45', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 12 }}>
-            {editId ? 'Edit Cost' : 'Add Cost'}
+            {editId ? 'Edit Cost Entry' : 'Add Cost Entry'}
           </div>
-          {error && <div style={{ fontSize: 12, color: '#ef4444', marginBottom: 10 }}>{error}</div>}
 
+          {error && (
+            <div style={{ fontSize: 12, color: '#ef4444', background: 'rgba(239,68,68,0.08)', borderRadius: 6, padding: '7px 10px', marginBottom: 12 }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {/* Category + Amount */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
-              <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>Type</label>
-              <select value={form.cost_type} onChange={e => setForm(f => ({ ...f, cost_type: e.target.value }))} style={{ ...INPUT, appearance: 'none' }}>
-                {COST_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+              <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>
+                Category <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select
+                value={form.category}
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                style={{ ...INPUT, appearance: 'none', cursor: 'pointer' }}
+              >
+                {COST_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>Amount (LKR) *</label>
-              <input type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0" style={INPUT} />
+              <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>
+                Amount (LKR) <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                type="number" min="0" step="1"
+                value={form.amount}
+                onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                placeholder="e.g. 15000"
+                style={INPUT}
+              />
             </div>
           </div>
 
+          {/* Description */}
           <div style={{ marginBottom: 10 }}>
-            <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>Description *</label>
-            <input type="text" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Full service + oil change" style={INPUT} />
+            <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>
+              Description <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={form.description}
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="e.g. Full service + oil change"
+              style={INPUT}
+            />
           </div>
 
+          {/* Date (calendar picker) + Supplier */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
             <div>
-              <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>Paid Date</label>
-              <input type="date" value={form.paid_date} onChange={e => setForm(f => ({ ...f, paid_date: e.target.value }))} style={INPUT} />
+              <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>
+                Date <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                type="date"
+                value={form.cost_date}
+                max={todayStr()}
+                onChange={e => setForm(f => ({ ...f, cost_date: e.target.value }))}
+                style={{ ...INPUT, colorScheme: 'dark', cursor: 'pointer' }}
+              />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>Supplier</label>
-              <input type="text" value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Optional" style={INPUT} />
+              <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>
+                Supplier <span style={{ fontSize: 10, color: '#3d5270' }}>(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={form.supplier}
+                onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))}
+                placeholder="e.g. Perera Motors"
+                style={INPUT}
+              />
             </div>
           </div>
 
@@ -193,7 +267,7 @@ export default function CostTable({ vehicleId, canEdit }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#111827' }}>
-                {['Type', 'Description', 'Supplier', 'Date', 'Amount', canEdit ? '' : ''].filter(Boolean).map(h => (
+                {['Category', 'Description', 'Date', 'Amount', canEdit ? '' : ''].filter(Boolean).map(h => (
                   <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#5c7090', letterSpacing: '0.06em' }}>{h}</th>
                 ))}
               </tr>
@@ -202,22 +276,19 @@ export default function CostTable({ vehicleId, canEdit }: Props) {
               {costs.map((cost, i) => (
                 <tr key={cost.id} style={{ borderTop: i > 0 ? '1px solid #1a2535' : 'none' }}>
                   <td style={{ padding: '10px 14px' }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.1)', padding: '2px 7px', borderRadius: 4 }}>
-                      {cost.cost_type}
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.1)', padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap' }}>
+                      {COST_CATEGORIES.find(c => c.value === cost.category)?.label ?? cost.category}
                     </span>
                   </td>
                   <td style={{ padding: '10px 14px', color: '#dde4f0' }}>{cost.description}</td>
-                  <td style={{ padding: '10px 14px', color: '#5c7090' }}>{cost.supplier ?? '—'}</td>
-                  <td style={{ padding: '10px 14px', color: '#5c7090', whiteSpace: 'nowrap' }}>{cost.paid_date ?? '—'}</td>
-                  <td style={{ padding: '10px 14px', fontWeight: 700, color: '#f59e0b', whiteSpace: 'nowrap' }}>{formatPrice(cost.amount)}</td>
+                  <td style={{ padding: '10px 14px', color: '#5c7090', whiteSpace: 'nowrap' }}>{formatDate(cost.cost_date)}</td>
+                  <td style={{ padding: '10px 14px', fontWeight: 700, color: '#f59e0b', whiteSpace: 'nowrap' }}>{formatPrice(Number(cost.amount))}</td>
                   {canEdit && (
                     <td style={{ padding: '10px 14px' }}>
                       <button onClick={() => startEdit(cost)} style={{
                         background: 'none', border: 'none', fontSize: 12,
                         color: '#5c7090', cursor: 'pointer', padding: '2px 6px',
-                      }}>
-                        ✏️
-                      </button>
+                      }}>✏️</button>
                     </td>
                   )}
                 </tr>
@@ -225,7 +296,7 @@ export default function CostTable({ vehicleId, canEdit }: Props) {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: '2px solid #1f2d45', background: '#111827' }}>
-                <td colSpan={4} style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, color: '#5c7090' }}>TOTAL COSTS</td>
+                <td colSpan={3} style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, color: '#5c7090' }}>TOTAL COSTS</td>
                 <td style={{ padding: '10px 14px', fontSize: 14, fontWeight: 900, color: '#f59e0b' }}>{formatPrice(total)}</td>
                 {canEdit && <td />}
               </tr>

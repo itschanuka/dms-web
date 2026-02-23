@@ -423,7 +423,7 @@ function DetailsTab({ vehicle }: { vehicle: AdminVehicle }) {
     {
       title: 'Purchase Information',
       fields: [
-        { label: 'Purchase Date',   value: vehicle.purchase_date                     },
+        { label: 'Purchase Date',   value: vehicle.purchase_date ? new Date(vehicle.purchase_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' },
         { label: 'Supplier',        value: vehicle.supplier_name                     },
         { label: 'Purchase Type',   value: formatLabel(vehicle.purchase_type)        },
         { label: 'Purchase Price',  value: formatPrice(vehicle.purchase_price)       },
