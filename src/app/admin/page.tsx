@@ -1,240 +1,90 @@
 'use client';
 
-import { useRouter, usePathname } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
-import { useEffect, useMemo } from 'react';
+import AdminShell from '@/components/admin/AdminShell';
+import Link from 'next/link';
 
 export default function AdminDashboard() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { employee, isLoading, isSignedIn, signOut } = useAuth();
-
-  // Keep routes consistent + avoid typos everywhere
-  const routes = useMemo(() => {
-    return {
-      login: '/admin/login',
-      changePassword: '/admin/change-password',
-      dashboard: '/admin',
-    };
-  }, []);
-
-  // Guard 1: if not signed in -> go to admin login
-  useEffect(() => {
-    if (isLoading) return;
-
-    if (!isSignedIn) {
-      // avoid re-redirect spam
-      if (pathname !== routes.login) router.replace(routes.login);
-      return;
-    }
-  }, [isLoading, isSignedIn, pathname, router, routes.login]);
-
-  // Guard 2: signed in but forced password change -> go change password
-  useEffect(() => {
-    if (isLoading) return;
-
-    if (isSignedIn && employee?.must_change_password) {
-      if (pathname !== routes.changePassword) router.replace(routes.changePassword);
-    }
-  }, [isLoading, isSignedIn, employee?.must_change_password, pathname, router, routes.changePassword]);
-
-  // Loading UI
-  if (isLoading) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#07090f',
-          fontFamily: 'system-ui, sans-serif',
-        }}
-      >
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
-          <p style={{ color: '#5c7090', fontSize: 14 }}>Loading…</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If not signed in OR employee not loaded yet, don't render dashboard content.
-  // Redirects above handle navigation.
-  if (!isSignedIn || !employee) return null;
+  const modules = [
+    { href: '/admin/inventory', icon: '🚗', label: 'Inventory',  desc: 'Manage vehicles',   color: '#6366f1' },
+    { href: '/admin/crm',       icon: '📋', label: 'CRM',        desc: 'Lead pipeline',     color: '#0ea5e9' },
+    { href: '/admin/deals',     icon: '🤝', label: 'Deals',      desc: 'Sales management',  color: '#10b981' },
+    { href: '/admin/customers', icon: '👤', label: 'Customers',  desc: 'Customer database', color: '#f59e0b' },
+    { href: '/admin/employees', icon: '👥', label: 'Employees',  desc: 'Staff management',  color: '#8b5cf6' },
+    { href: '/admin/reports',   icon: '📈', label: 'Reports',    desc: 'Analytics',         color: '#ef4444' },
+  ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#07090f', fontFamily: 'system-ui, sans-serif' }}>
-      {/* Header */}
-      <header
-        style={{
-          background: '#0d1117',
-          borderBottom: '1px solid #1f2d45',
-          padding: '0 32px',
-          height: 60,
+    <AdminShell>
+      <div style={{ padding: '40px 28px' }}>
+
+        {/* Page title */}
+        <div style={{ marginBottom: 32 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 900, color: '#fff', margin: 0 }}>Dashboard</h1>
+          <p style={{ fontSize: 13, color: '#5c7090', margin: '6px 0 0' }}>
+            Full KPI analytics coming in Phase 13. Click a module to get started.
+          </p>
+        </div>
+
+        {/* Phase 0 complete banner */}
+        <div style={{
+          background: 'rgba(16,185,129,0.08)',
+          border: '1px solid rgba(16,185,129,0.25)',
+          borderRadius: 12,
+          padding: '20px 24px',
+          marginBottom: 32,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            style={{
-              background: 'rgba(99,102,241,0.2)',
-              border: '1px solid rgba(99,102,241,0.4)',
-              borderRadius: 8,
-              padding: '4px 10px',
-              fontSize: 11,
-              fontWeight: 700,
-              color: '#818cf8',
-              letterSpacing: '0.08em',
-            }}
-          >
-            DMS
-          </div>
-          <span style={{ fontSize: 14, color: '#5c7090' }}>Dealership Management System</span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 13, color: '#dde4f0', fontWeight: 600 }}>{employee.full_name}</div>
-            <div style={{ fontSize: 11, color: '#5c7090', textTransform: 'capitalize' }}>{employee.role}</div>
-          </div>
-
-          <button
-            onClick={() => void signOut()}
-            style={{
-              background: 'rgba(239,68,68,0.1)',
-              border: '1px solid rgba(239,68,68,0.2)',
-              borderRadius: 6,
-              color: '#fca5a5',
-              padding: '6px 12px',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      {/* Main content */}
-      <main style={{ padding: '48px 32px', maxWidth: 900, margin: '0 auto' }}>
-        {/* Phase 0 complete banner */}
-        <div
-          style={{
-            background: 'rgba(16,185,129,0.08)',
-            border: '1px solid rgba(16,185,129,0.25)',
-            borderRadius: 12,
-            padding: '20px 24px',
-            marginBottom: 32,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
-          }}
-        >
+          gap: 16,
+        }}>
           <span style={{ fontSize: 28 }}>✅</span>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#34d399', marginBottom: 2 }}>
               Phase 0 — Foundation complete
             </div>
             <div style={{ fontSize: 13, color: '#5c7090' }}>
-              Authentication is working. DB migrations ran. Audit log is recording. Ready for Phase 1.
+              Authentication is working. DB migrations ran. Audit log is recording.
             </div>
           </div>
         </div>
 
-        {/* Employee card */}
-        <div
-          style={{
-            background: '#0d1117',
-            border: '1px solid #1f2d45',
-            borderRadius: 12,
-            padding: '24px 28px',
-            marginBottom: 24,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: '#5c7090',
-              marginBottom: 16,
-            }}
-          >
-            Your account
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 20 }}>
-            {[
-              { label: 'Name', value: employee.full_name },
-              { label: 'Code', value: employee.employee_code },
-              { label: 'Role', value: employee.role },
-              { label: 'MFA', value: employee.totp_enabled ? 'Enabled ✓' : 'Not set up' },
-            ].map((item) => (
-              <div key={item.label}>
-                <div style={{ fontSize: 11, color: '#5c7090', marginBottom: 4, fontWeight: 600 }}>{item.label}</div>
-                <div style={{ fontSize: 14, color: '#dde4f0', fontWeight: 500 }}>{item.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Coming soon modules */}
-        <div
-          style={{
-            background: '#0d1117',
-            border: '1px solid #1f2d45',
-            borderRadius: 12,
-            padding: '24px 28px',
-          }}
-        >
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: '#5c7090',
-              marginBottom: 16,
-            }}
-          >
-            Modules — coming in future phases
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
-            {[
-              { icon: '🌐', label: 'Public Site', phase: 1 },
-              { icon: '🚗', label: 'Inventory', phase: 2 },
-              { icon: '👥', label: 'Customers', phase: 3 },
-              { icon: '📊', label: 'CRM / Leads', phase: 4 },
-              { icon: '💼', label: 'Sales', phase: 5 },
-              { icon: '💰', label: 'Commissions', phase: 6 },
-              { icon: '👤', label: 'Employees', phase: 7 },
-              { icon: '📋', label: 'Expenses', phase: 8 },
-              { icon: '📈', label: 'Reports', phase: 9 },
-            ].map((mod) => (
+        {/* Module grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+          {modules.map(m => (
+            <Link key={m.href} href={m.href} style={{ textDecoration: 'none' }}>
               <div
-                key={mod.label}
                 style={{
-                  background: '#111827',
-                  border: '1px solid #1f2d45',
-                  borderRadius: 8,
-                  padding: '12px 14px',
-                  opacity: 0.5,
+                  background: '#0d1117', border: '1px solid #1f2d45', borderRadius: 12,
+                  padding: '24px 20px', cursor: 'pointer', transition: 'border-color 0.15s',
                 }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#253550')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#1f2d45')}
               >
-                <div style={{ fontSize: 18, marginBottom: 6 }}>{mod.icon}</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#8097b8' }}>{mod.label}</div>
-                <div style={{ fontSize: 10, color: '#3a4e6a', marginTop: 2 }}>Phase {mod.phase}</div>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>{m.icon}</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 4 }}>{m.label}</div>
+                <div style={{ fontSize: 12, color: '#5c7090' }}>{m.desc}</div>
+                <div style={{ marginTop: 14, fontSize: 11, fontWeight: 700, color: m.color }}>Open →</div>
               </div>
-            ))}
+            </Link>
+          ))}
+        </div>
+
+        {/* Phase 2 active notice */}
+        <div style={{
+          marginTop: 32,
+          background: 'rgba(16,185,129,0.06)',
+          border: '1px solid rgba(16,185,129,0.2)',
+          borderRadius: 12,
+          padding: '18px 20px',
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#10b981', marginBottom: 4 }}>
+            ✓ Phase 2 — Inventory System Active
+          </div>
+          <div style={{ fontSize: 12, color: '#5c7090' }}>
+            You can now add vehicles, track costs, upload photos, manage status, and toggle website visibility.
           </div>
         </div>
-      </main>
-    </div>
+
+      </div>
+    </AdminShell>
   );
 }
