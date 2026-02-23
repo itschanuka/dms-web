@@ -92,12 +92,14 @@ export default function AdminDashboard() {
 
   const dk = isDark;
   const t = {
-    bg:        dk ? '#070a12' : '#dde6f0',
-    bgCard:    dk ? '#0d1525' : '#e8f0f9',
-    border:    dk ? '#1a2540' : '#b8ccdf',
-    text:      dk ? '#e2e8f0' : '#1a2c42',
-    textSub:   dk ? '#4a6080' : '#3d5a78',
-    textMuted: dk ? '#2a3d60' : '#6a88a8',
+    // Surfaces
+    bg:        dk ? '#141c2e' : '#dde6f0',
+    bgCard:    dk ? '#1c2538' : '#e4edf8',
+    border:    dk ? '#263550' : '#aec2d6',
+    // Text — distinct contrast levels
+    text:      dk ? '#e8f0fc' : '#0f1e32',   // primary: near-white on dark, deep navy on light
+    textSub:   dk ? '#7a94b8' : '#2e4a68',   // subtext: readable mid-tone
+    textMuted: dk ? '#3d5270' : '#6a88a8',   // hints: clearly subordinate
   };
 
   if (!mounted) return null;
@@ -120,8 +122,8 @@ export default function AdminDashboard() {
           position:     'relative',
           overflow:     'hidden',
           background:   dk
-            ? 'linear-gradient(135deg, #080e1c 0%, #0d1a2e 60%, #070a12 100%)'
-            : 'linear-gradient(135deg, #cdd9eb 0%, #d4daf0 60%, #c8dce8 100%)',
+            ? 'linear-gradient(135deg, #111827 0%, #162032 60%, #141c2e 100%)'
+            : 'linear-gradient(135deg, #c8d6e8 0%, #d0d8ee 60%, #c4d8e4 100%)',
           padding:      '36px 28px 30px',
           borderBottom: `1px solid ${t.border}`,
         }}>

@@ -75,18 +75,21 @@ export default function AdminShell({ children }: Props) {
 
   // Color tokens — all theme-aware in one place
   const c = {
-    bg:           isDark ? '#070a12' : '#dde6f0',
-    header:       isDark ? '#0b0f1a' : '#d4dff0',
-    border:       isDark ? '#131b2e' : '#b8ccdf',
-    navText:      isDark ? '#4a6080' : '#4a6080',
-    navHover:     isDark ? '#8097b8' : '#1a2c42',
-    breadBg:      isDark ? '#08101c' : '#ccd7e8',
-    breadBorder:  isDark ? '#0f1a2e' : '#b0c4d8',
-    text:         isDark ? '#c4d0e4' : '#1a2c42',
-    textMuted:    isDark ? '#3d5070' : '#4a6080',
-    dropdownBg:   isDark ? '#0d1525' : '#e8f0f9',
-    shadow:       isDark ? '0 16px 48px rgba(0,0,0,0.6)' : '0 8px 30px rgba(0,0,0,0.12)',
-    hoverRow:     isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+    // Surfaces
+    bg:          isDark ? '#141c2e' : '#dde6f0',
+    header:      isDark ? '#1c2538' : '#cdd8ea',
+    border:      isDark ? '#263550' : '#aec2d6',
+    breadBg:     isDark ? '#111827' : '#c8d6e8',
+    breadBorder: isDark ? '#1e2d42' : '#adc0d4',
+    dropdownBg:  isDark ? '#1c2538' : '#e4edf8',
+    hoverRow:    isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+    shadow:      isDark ? '0 16px 48px rgba(0,0,0,0.5)' : '0 8px 30px rgba(0,0,0,0.12)',
+    // Text — clear contrast hierarchy for both modes
+    text:        isDark ? '#e8f0fc' : '#0f1e32',   // primary: almost white on dark, deep navy on light
+    textMuted:   isDark ? '#5a7295' : '#4a6278',   // secondary labels
+    // Nav
+    navText:     isDark ? '#607898' : '#4a6278',
+    navHover:    isDark ? '#c8d8f0' : '#0f1e32',
   };
 
   return (
