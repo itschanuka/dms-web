@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -138,25 +138,29 @@ async function publicFetch<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   });
   const json = await res.json() as { success: boolean; data?: T; error?: { message: string } };
-  if (!json.success) {
-    throw new Error(json.error?.message ?? 'API error');
-  }
+  if (!json.success) throw new Error(json.error?.message ?? 'API error');
   return json.data as T;
 }
 
 async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  // createClient() returns a fresh browser Supabase client each call
+  const supabase = createClient();
   const { data } = await supabase.auth.getSession();
   const token    = data.session?.access_token;
 
   const res = await fetch(`${API_URL}${path}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     ...options,
   });
 
-  const json = await res.json() as { success: boolean; data?: T; error?: { code: string; message: string } };
+  const json = await res.json() as {
+    success: boolean;
+    data?:   T;
+    error?:  { code: string; message: string };
+  };
   if (!json.success) throw new Error(json.error?.message ?? `Request failed: ${res.status}`);
   return json.data as T;
 }
@@ -178,7 +182,6 @@ export interface VehicleListParams {
 }
 
 export const publicApi = {
-  /** Get paginated public vehicle listing */
   getVehicles: (params: VehicleListParams = {}) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
@@ -189,15 +192,12 @@ export const publicApi = {
     );
   },
 
-  /** Get available filter values for the inventory page */
   getVehicleFilters: () =>
     publicFetch<VehicleFilters>('/public/vehicles/filters'),
 
-  /** Get a single vehicle detail */
   getVehicle: (id: string) =>
     publicFetch<PublicVehicleDetail>(`/public/vehicles/${id}`),
 
-  /** Submit the contact form */
   submitContact: (data: ContactFormData) =>
     publicFetch<{ message: string }>('/public/contact', {
       method: 'POST',
@@ -222,11 +222,13 @@ export interface AdminVehicleListParams {
 }
 
 export const adminApi = {
-  // ── Inventory ───────────────────────────────────────────
+  // ── Inventory ─────────────────────────────────────────────
 
   listVehicles: (params: AdminVehicleListParams = {}) => {
     const qs = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') qs.set(k, String(v)); });
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v));
+    });
     return adminFetch<{ vehicles: AdminVehicle[]; pagination: Pagination }>(
       `/inventory${qs.toString() ? '?' + qs.toString() : ''}`
     );
@@ -242,36 +244,57 @@ export const adminApi = {
     adminFetch<AdminVehicle>(`/inventory/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   changeStatus: (id: string, status: string) =>
-    adminFetch<AdminVehicle>(`/inventory/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    adminFetch<AdminVehicle>(`/inventory/${id}/status`, {
+      method: 'PATCH',
+      body:   JSON.stringify({ status }),
+    }),
 
   toggleWebsite: (id: string) =>
-    adminFetch<{ id: string; show_on_website: boolean }>(`/inventory/${id}/website-toggle`, { method: 'PATCH' }),
+    adminFetch<{ id: string; show_on_website: boolean }>(
+      `/inventory/${id}/website-toggle`,
+      { method: 'PATCH' }
+    ),
 
   deleteVehicle: (id: string) =>
     adminFetch<{ message: string }>(`/inventory/${id}`, { method: 'DELETE' }),
 
-  // ── Costs ───────────────────────────────────────────────
+  // ── Costs ─────────────────────────────────────────────────
 
   getCosts: (vehicleId: string) =>
     adminFetch<VehicleCost[]>(`/inventory/${vehicleId}/costs`),
 
   addCost: (vehicleId: string, data: Partial<VehicleCost>) =>
-    adminFetch<VehicleCost>(`/inventory/${vehicleId}/costs`, { method: 'POST', body: JSON.stringify(data) }),
+    adminFetch<VehicleCost>(`/inventory/${vehicleId}/costs`, {
+      method: 'POST',
+      body:   JSON.stringify(data),
+    }),
 
   updateCost: (vehicleId: string, costId: string, data: Partial<VehicleCost>) =>
-    adminFetch<VehicleCost>(`/inventory/${vehicleId}/costs/${costId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    adminFetch<VehicleCost>(`/inventory/${vehicleId}/costs/${costId}`, {
+      method: 'PUT',
+      body:   JSON.stringify(data),
+    }),
 
-  // ── Documents ───────────────────────────────────────────
+  // ── Documents ─────────────────────────────────────────────
 
   getDocuments: (vehicleId: string) =>
     adminFetch<VehicleDocument[]>(`/inventory/${vehicleId}/documents`),
 
   addDocument: (vehicleId: string, data: Partial<VehicleDocument>) =>
-    adminFetch<VehicleDocument>(`/inventory/${vehicleId}/documents`, { method: 'POST', body: JSON.stringify(data) }),
+    adminFetch<VehicleDocument>(`/inventory/${vehicleId}/documents`, {
+      method: 'POST',
+      body:   JSON.stringify(data),
+    }),
 
   deleteDocument: (vehicleId: string, docId: string) =>
-    adminFetch<{ message: string }>(`/inventory/${vehicleId}/documents/${docId}`, { method: 'DELETE' }),
+    adminFetch<{ message: string }>(
+      `/inventory/${vehicleId}/documents/${docId}`,
+      { method: 'DELETE' }
+    ),
 
   setMainImage: (vehicleId: string, docId: string) =>
-    adminFetch<{ message: string }>(`/inventory/${vehicleId}/documents/${docId}/set-main`, { method: 'PATCH' }),
+    adminFetch<{ message: string }>(
+      `/inventory/${vehicleId}/documents/${docId}/set-main`,
+      { method: 'PATCH' }
+    ),
 };
