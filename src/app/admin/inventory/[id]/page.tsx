@@ -12,20 +12,27 @@ import { adminApi, type AdminVehicle } from '@/lib/api';
 import { formatPrice, formatMileage, formatCondition, formatTransmission, formatFuelType, formatLabel } from '@/lib/formatters';
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  draft:       ['available'],
+  draft:       ['in_repair', 'available'],
+  in_repair:   ['available'],
   available:   ['reserved', 'sold', 'written_off'],
   reserved:    ['available', 'sold'],
-  sold:        [],
+  sold:        ['available'],       // Admin reversal for accidental sales
   written_off: [],
 };
 
 const STATUS_LABELS: Record<string, string> = {
   available:   'Mark as Available',
+  in_repair:   'Mark as In Repair',
   reserved:    'Mark as Reserved',
   sold:        'Mark as Sold',
-  written_off: 'Write Off',
+  written_off: 'Write Off Vehicle',
   draft:       'Revert to Draft',
 };
+
+// Statuses that require extra danger confirmation
+const DANGER_STATUSES = new Set(['sold', 'written_off']);
+// Statuses that are reversals (undo accidental action)
+const REVERSAL_STATUSES = new Set<string>(['available']); // when coming from sold
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -54,7 +61,18 @@ export default function VehicleDetailPage({ params }: Props) {
   }
 
   async function handleStatusChange(newStatus: string) {
-    if (!confirm(`Change status to "${newStatus}"?`)) return;
+    const currentStatus = vehicle?.status ?? '';
+    let confirmMsg = `Change status to "${STATUS_LABELS[newStatus] ?? newStatus}"?`;
+
+    if (newStatus === 'written_off') {
+      confirmMsg = '⚠️ WRITE OFF VEHICLE\n\nThis will permanently mark the vehicle as written off and remove it from active inventory.\n\nAre you absolutely sure?';
+    } else if (newStatus === 'sold') {
+      confirmMsg = '⚠️ MARK AS SOLD\n\nMake sure a deal has been properly created first.\n\nContinue?';
+    } else if (currentStatus === 'sold' && newStatus === 'available') {
+      confirmMsg = '⚠️ REVERSE SALE\n\nThis will undo the sold status and return the vehicle to Available.\n\nOnly do this if the sale was entered accidentally. Continue?';
+    }
+
+    if (!confirm(confirmMsg)) return;
     setStatusLoading(true);
     try {
       const updated = await adminApi.changeStatus(id, newStatus);
@@ -189,16 +207,30 @@ export default function VehicleDetailPage({ params }: Props) {
               <div style={{ background: '#0d1117', border: '1px solid #1f2d45', borderRadius: 12, padding: 18 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#5c7090', letterSpacing: '0.08em', marginBottom: 12 }}>CHANGE STATUS</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {transitions.map(s => (
-                    <button key={s} onClick={() => void handleStatusChange(s)} disabled={statusLoading} style={{
-                      width: '100%', padding: '9px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  {transitions.map(s => {
+                    const isDanger   = DANGER_STATUSES.has(s);
+                    const isReversal = vehicle.status === 'sold' && REVERSAL_STATUSES.has(s);
+                    const btnStyle: React.CSSProperties = isReversal ? {
+                      background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
+                      color: '#f59e0b',
+                    } : isDanger ? {
+                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                      color: '#ef4444',
+                    } : {
                       background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-                      color: '#818cf8', cursor: statusLoading ? 'not-allowed' : 'pointer',
-                      opacity: statusLoading ? 0.7 : 1, textAlign: 'left',
-                    }}>
-                      {STATUS_LABELS[s] ?? s}
-                    </button>
-                  ))}
+                      color: '#818cf8',
+                    };
+                    return (
+                      <button key={s} onClick={() => void handleStatusChange(s)} disabled={statusLoading} style={{
+                        width: '100%', padding: '9px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                        cursor: statusLoading ? 'not-allowed' : 'pointer',
+                        opacity: statusLoading ? 0.7 : 1, textAlign: 'left',
+                        ...btnStyle,
+                      }}>
+                        {isReversal ? '↩ ' : isDanger ? '⚠ ' : ''}{STATUS_LABELS[s] ?? s}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
