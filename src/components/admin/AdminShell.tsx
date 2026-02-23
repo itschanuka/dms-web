@@ -88,7 +88,7 @@ export default function AdminShell({ children, theme = 'dark', onThemeToggle }: 
       display:       'flex',
       flexDirection: 'column',
       minHeight:     '100vh',
-      background:    theme === 'dark' ? '#070a12' : '#f0f4f8',
+      background:    theme === 'dark' ? '#070a12' : '#dde6f0',
       fontFamily:    "'Geist', 'DM Sans', ui-sans-serif, system-ui, sans-serif",
     }}>
 
@@ -97,8 +97,8 @@ export default function AdminShell({ children, theme = 'dark', onThemeToggle }: 
       ══════════════════════════════════════════════════════ */}
       <header style={{
         height:          52,
-        background:      theme === 'dark' ? '#0b0f1a' : '#ffffff',
-        borderBottom:    theme === 'dark' ? '1px solid #131b2e' : '1px solid #e2e8f0',
+        background:      theme === 'dark' ? '#0b0f1a' : '#d4dff0',
+        borderBottom:    theme === 'dark' ? '1px solid #131b2e' : '1px solid #b8ccdf',
         display:         'flex',
         alignItems:      'center',
         justifyContent:  'space-between',
@@ -231,7 +231,7 @@ export default function AdminShell({ children, theme = 'dark', onThemeToggle }: 
           MODULE NAV BAR — The separate navigation header
       ══════════════════════════════════════════════════════ */}
       <nav style={{
-        background:   theme === 'dark' ? '#0b0f1a' : '#ffffff',
+        background:   theme === 'dark' ? '#0b0f1a' : '#d4dff0',
         borderBottom: scrolled ? '1px solid #1a2540' : '1px solid #0f1524',
         position:     'sticky',
         top:          52,

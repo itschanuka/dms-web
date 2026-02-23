@@ -102,18 +102,18 @@ export default function AdminDashboard() {
 
   const dk = theme === 'dark';
 
-  // Theme tokens
+  // Theme tokens — light mode uses soft blue-gray, never pure white
   const t = {
-    bg:          dk ? '#070a12'  : '#f0f4f8',
-    bgCard:      dk ? '#0d1525'  : '#ffffff',
-    bgCard2:     dk ? '#0b1220'  : '#f8fafc',
-    border:      dk ? '#1a2540'  : '#e2e8f0',
-    borderHover: dk ? '#2a3d60'  : '#cbd5e1',
-    text:        dk ? '#e2e8f0'  : '#0f172a',
-    textSub:     dk ? '#4a6080'  : '#64748b',
-    textMuted:   dk ? '#2a3d60'  : '#94a3b8',
-    headerBg:    dk ? '#0b0f1a'  : '#ffffff',
-    navBg:       dk ? '#0b0f1a'  : '#f8fafc',
+    bg:          dk ? '#070a12'  : '#dde6f0',
+    bgCard:      dk ? '#0d1525'  : '#e8f0f9',
+    bgCard2:     dk ? '#0b1220'  : '#e2ecf6',
+    border:      dk ? '#1a2540'  : '#b8ccdf',
+    borderHover: dk ? '#2a3d60'  : '#90aac8',
+    text:        dk ? '#e2e8f0'  : '#1a2c42',
+    textSub:     dk ? '#4a6080'  : '#3d5a78',
+    textMuted:   dk ? '#2a3d60'  : '#6a88a8',
+    headerBg:    dk ? '#0b0f1a'  : '#d4dff0',
+    navBg:       dk ? '#0b0f1a'  : '#d4dff0',
   };
 
   if (!mounted) return null;
@@ -133,7 +133,7 @@ export default function AdminDashboard() {
           overflow:   'hidden',
           background: dk
             ? 'linear-gradient(135deg, #080e1c 0%, #0d1a2e 50%, #070a12 100%)'
-            : 'linear-gradient(135deg, #dbeafe 0%, #ede9fe 50%, #f0fdf4 100%)',
+            : 'linear-gradient(135deg, #cdd9eb 0%, #d4daf0 50%, #c8dce8 100%)',
           padding:    '36px 28px 28px',
           borderBottom: `1px solid ${t.border}`,
         }}>
