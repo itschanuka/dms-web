@@ -8,43 +8,133 @@ import StatusBadge from '@/components/admin/StatusBadge';
 import WebsiteToggle from '@/components/admin/WebsiteToggle';
 import CostTable from '@/components/admin/CostTable';
 import PhotoGallery from '@/components/admin/PhotoGallery';
+import { useAuth } from '@/hooks/useAuth';
 import { adminApi, type AdminVehicle } from '@/lib/api';
 import { formatPrice, formatMileage, formatCondition, formatTransmission, formatFuelType, formatLabel } from '@/lib/formatters';
 
-const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+// ─────────────────────────────────────────────────────────────
+// STATUS TRANSITION LOGIC
+// Must stay in sync with inventory.service.ts on the API side.
+// The API is the source of truth — this is just for UI rendering.
+// ─────────────────────────────────────────────────────────────
+
+type VehicleStatus = 'draft' | 'in_repair' | 'available' | 'reserved' | 'sold' | 'written_off';
+
+const ALLOWED_TRANSITIONS: Record<VehicleStatus, VehicleStatus[]> = {
   draft:       ['in_repair', 'available'],
-  in_repair:   ['available'],
-  available:   ['reserved', 'sold', 'written_off'],
+  in_repair:   ['available', 'draft'],
+  available:   ['in_repair', 'reserved', 'sold', 'written_off'],
   reserved:    ['available', 'sold'],
-  sold:        ['available'],       // Admin reversal for accidental sales
-  written_off: [],
+  sold:        ['available'],
+  written_off: ['available'],
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  available:   'Mark as Available',
-  in_repair:   'Mark as In Repair',
-  reserved:    'Mark as Reserved',
-  sold:        'Mark as Sold',
-  written_off: 'Write Off Vehicle',
-  draft:       'Revert to Draft',
+// Which employee_permissions key is needed for each gated transition.
+// Admin always bypasses this. Others need the specific flag.
+const PERMISSION_GATED: Record<string, string> = {
+  'in_repair→draft':       'delete_records',
+  'available→written_off': 'delete_records',
+  'sold→available':        'cancel_deal',
+  'written_off→available': 'delete_records',
 };
 
-// Statuses that require extra danger confirmation
-const DANGER_STATUSES = new Set(['sold', 'written_off']);
-// Statuses that are reversals (undo accidental action)
-const REVERSAL_STATUSES = new Set<string>(['available']); // when coming from sold
+interface TransitionOption {
+  status:      VehicleStatus;
+  label:       string;
+  variant:     'normal' | 'danger' | 'warning' | 'recovery';
+  confirmMsg:  string;
+  canDo:       boolean;   // false = button shown but greyed + tooltip
+  blockedMsg?: string;    // shown on hover when canDo = false
+}
+
+const STATUS_META: Record<VehicleStatus, { label: string; variant: TransitionOption['variant']; confirmMsg: string }> = {
+  draft:       { label: '↩ Revert to Draft',       variant: 'warning',  confirmMsg: 'Revert this vehicle back to Draft status?' },
+  in_repair:   { label: '🔧 Mark as In Repair',    variant: 'normal',   confirmMsg: 'Mark this vehicle as In Repair?' },
+  available:   { label: '✅ Mark as Available',     variant: 'normal',   confirmMsg: 'Mark this vehicle as Available?' },
+  reserved:    { label: '🔒 Mark as Reserved',      variant: 'normal',   confirmMsg: 'Mark this vehicle as Reserved for a customer?' },
+  sold:        { label: '💰 Mark as Sold',          variant: 'danger',   confirmMsg: '⚠️ MARK AS SOLD\n\nMake sure a deal has been created first.\n\nContinue?' },
+  written_off: { label: '🚫 Write Off Vehicle',     variant: 'danger',   confirmMsg: '⚠️ WRITE OFF VEHICLE\n\nThis removes the vehicle from active inventory permanently (unless recovered).\n\nAre you absolutely sure?' },
+};
+
+// Special override confirm messages for reversals
+const REVERSAL_CONFIRM: Partial<Record<string, string>> = {
+  'sold→available':        '⚠️ REVERSE SALE\n\nThis undoes the sold status and returns the vehicle to Available.\n\nOnly do this if the sale was entered accidentally. Continue?',
+  'written_off→available': '⚠️ RECOVER WRITTEN-OFF VEHICLE\n\nThis returns the vehicle to Available (e.g. after insurance or repair).\n\nContinue?',
+};
+
+function getTransitionOptions(
+  currentStatus: VehicleStatus,
+  role:          string,
+  permissions:   Record<string, boolean>,
+): TransitionOption[] {
+  const transitions = ALLOWED_TRANSITIONS[currentStatus] ?? [];
+
+  return transitions.map(toStatus => {
+    const key         = `${currentStatus}→${toStatus}`;
+    const requiredPerm = PERMISSION_GATED[key];
+    const meta        = STATUS_META[toStatus];
+    const isAdmin     = role === 'admin';
+
+    let canDo       = true;
+    let blockedMsg: string | undefined;
+
+    if (!isAdmin) {
+      // Non-admin must be at least manager
+      if (role !== 'manager') {
+        canDo       = false;
+        blockedMsg  = 'Only managers and admins can change vehicle status';
+      } else if (requiredPerm && !permissions[requiredPerm]) {
+        // Manager but missing the required permission
+        const permLabels: Record<string, string> = {
+          delete_records: 'Delete Records',
+          cancel_deal:    'Cancel Deal',
+        };
+        canDo       = false;
+        blockedMsg  = `Requires "${permLabels[requiredPerm] ?? requiredPerm}" permission — ask your admin to enable it`;
+      }
+    }
+
+    const confirmMsg = REVERSAL_CONFIRM[key] ?? meta.confirmMsg;
+
+    return {
+      status:   toStatus,
+      label:    meta.label,
+      variant:  meta.variant,
+      confirmMsg,
+      canDo,
+      blockedMsg,
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// BUTTON STYLES
+// ─────────────────────────────────────────────────────────────
+
+const VARIANT_STYLES: Record<TransitionOption['variant'], React.CSSProperties> = {
+  normal:   { background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',  color: '#818cf8' },
+  danger:   { background: 'rgba(239,68,68,0.08)',  border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444' },
+  warning:  { background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b' },
+  recovery: { background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', color: '#10b981' },
+};
+
+// ─────────────────────────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────────────────────────
 
 interface Props { params: Promise<{ id: string }> }
 
 export default function VehicleDetailPage({ params }: Props) {
-  const { id }   = use(params);
-  const router   = useRouter();
-  const [vehicle,   setVehicle]   = useState<AdminVehicle | null>(null);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState('');
+  const { id }  = use(params);
+  const router  = useRouter();
+  const { employee, isAdmin, can } = useAuth();
+
+  const [vehicle,       setVehicle]       = useState<AdminVehicle | null>(null);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState('');
   const [statusLoading, setStatusLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'costs' | 'media'>('details');
+  const [activeTab,     setActiveTab]     = useState<'details' | 'costs' | 'media'>('details');
 
   useEffect(() => { void load(); }, [id]);
 
@@ -60,25 +150,23 @@ export default function VehicleDetailPage({ params }: Props) {
     }
   }
 
-  async function handleStatusChange(newStatus: string) {
-    const currentStatus = vehicle?.status ?? '';
-    let confirmMsg = `Change status to "${STATUS_LABELS[newStatus] ?? newStatus}"?`;
+  async function handleStatusChange(option: TransitionOption) {
+    if (!option.canDo) return; // blocked — button should be disabled anyway
 
-    if (newStatus === 'written_off') {
-      confirmMsg = '⚠️ WRITE OFF VEHICLE\n\nThis will permanently mark the vehicle as written off and remove it from active inventory.\n\nAre you absolutely sure?';
-    } else if (newStatus === 'sold') {
-      confirmMsg = '⚠️ MARK AS SOLD\n\nMake sure a deal has been properly created first.\n\nContinue?';
-    } else if (currentStatus === 'sold' && newStatus === 'available') {
-      confirmMsg = '⚠️ REVERSE SALE\n\nThis will undo the sold status and return the vehicle to Available.\n\nOnly do this if the sale was entered accidentally. Continue?';
-    }
+    if (!confirm(option.confirmMsg)) return;
 
-    if (!confirm(confirmMsg)) return;
     setStatusLoading(true);
     try {
-      const updated = await adminApi.changeStatus(id, newStatus);
+      const updated = await adminApi.changeStatus(id, option.status);
       setVehicle(prev => prev ? { ...prev, status: updated.status } : null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to change status');
+      const msg = err instanceof Error ? err.message : 'Failed to change status';
+      // Show a friendlier message for permission errors
+      if (msg.includes('permission') || msg.includes('Permission')) {
+        alert(`❌ Permission denied\n\n${msg}`);
+      } else {
+        alert(msg);
+      }
     } finally {
       setStatusLoading(false);
     }
@@ -111,8 +199,15 @@ export default function VehicleDetailPage({ params }: Props) {
     </AdminShell>
   );
 
-  const transitions = ALLOWED_TRANSITIONS[vehicle.status] ?? [];
-  const isManager   = true; // TODO: use real role from useAuth when available
+  const role        = employee?.role ?? 'salesperson';
+  const permissions = (employee?.permissions ?? {}) as Record<string, boolean>;
+  const canEdit     = isAdmin || role === 'manager';
+
+  const transitionOptions = getTransitionOptions(
+    vehicle.status as VehicleStatus,
+    role,
+    permissions,
+  );
 
   return (
     <AdminShell>
@@ -141,36 +236,47 @@ export default function VehicleDetailPage({ params }: Props) {
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Link href={`/admin/inventory/${id}/edit`} style={{
-              background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
-              color: '#818cf8', textDecoration: 'none',
-              padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700,
-            }}>
-              ✏️ Edit
-            </Link>
-            <button onClick={handleDelete} disabled={deleteLoading} style={{
-              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-              color: '#ef4444', padding: '8px 16px', borderRadius: 8,
-              fontSize: 12, fontWeight: 700, cursor: 'pointer',
-            }}>
-              🗑 Delete
-            </button>
+            {canEdit && (
+              <Link href={`/admin/inventory/${id}/edit`} style={{
+                background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
+                color: '#818cf8', textDecoration: 'none',
+                padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+              }}>
+                ✏️ Edit
+              </Link>
+            )}
+            {can('delete_records') && (
+              <button onClick={handleDelete} disabled={deleteLoading} style={{
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                color: '#ef4444', padding: '8px 16px', borderRadius: 8,
+                fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}>
+                🗑 Delete
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Top cards row */}
+        {/* Top KPI cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 24 }}>
-          <KpiCard label="Asking Price"  value={formatPrice(vehicle.asking_price)}                        color="#fff" />
-          <KpiCard label="Total Cost"    value={formatPrice(vehicle.total_cost_cache ?? vehicle.purchase_price)} color="#f59e0b" />
-          <KpiCard label="Est. Profit"   value={(vehicle.estimated_profit >= 0 ? '+' : '') + formatPrice(vehicle.estimated_profit)} color={vehicle.estimated_profit >= 0 ? '#10b981' : '#ef4444'} />
-          {vehicle.minimum_price && <KpiCard label="Min Price" value={formatPrice(vehicle.minimum_price)} color="#5c7090" />}
+          <KpiCard label="Asking Price" value={formatPrice(vehicle.asking_price)} color="#fff" />
+          <KpiCard label="Total Cost"   value={formatPrice(vehicle.total_cost_cache ?? vehicle.purchase_price)} color="#f59e0b" />
+          <KpiCard
+            label="Est. Profit"
+            value={(vehicle.estimated_profit >= 0 ? '+' : '') + formatPrice(vehicle.estimated_profit)}
+            color={vehicle.estimated_profit >= 0 ? '#10b981' : '#ef4444'}
+            // Only show profit to those with view_profit permission (or admin)
+            hidden={!can('view_profit')}
+          />
+          {vehicle.minimum_price && can('view_profit') && (
+            <KpiCard label="Min Price" value={formatPrice(vehicle.minimum_price)} color="#5c7090" />
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
 
           {/* ── Left column ─────────────────────────────── */}
           <div>
-            {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid #1f2d45', paddingBottom: 0 }}>
               {(['details', 'costs', 'media'] as const).map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)} style={{
@@ -188,8 +294,8 @@ export default function VehicleDetailPage({ params }: Props) {
 
             <div style={{ background: '#0d1117', border: '1px solid #1f2d45', borderRadius: 12, padding: 24 }}>
               {activeTab === 'details' && <DetailsTab vehicle={vehicle} />}
-              {activeTab === 'costs'   && <CostTable vehicleId={vehicle.id} canEdit={isManager} />}
-              {activeTab === 'media'   && <PhotoGallery vehicleId={vehicle.id} stockId={vehicle.stock_id} canEdit={isManager} />}
+              {activeTab === 'costs'   && <CostTable vehicleId={vehicle.id} canEdit={canEdit} />}
+              {activeTab === 'media'   && <PhotoGallery vehicleId={vehicle.id} stockId={vehicle.stock_id} canEdit={canEdit} />}
             </div>
           </div>
 
@@ -197,40 +303,43 @@ export default function VehicleDetailPage({ params }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
             {/* Website toggle */}
-            <div style={{ background: '#0d1117', border: '1px solid #1f2d45', borderRadius: 12, padding: 18 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#5c7090', letterSpacing: '0.08em', marginBottom: 12 }}>WEBSITE VISIBILITY</div>
-              <WebsiteToggle vehicleId={vehicle.id} initialValue={vehicle.show_on_website} vehicleStatus={vehicle.status} />
-            </div>
+            {canEdit && (
+              <div style={{ background: '#0d1117', border: '1px solid #1f2d45', borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#5c7090', letterSpacing: '0.08em', marginBottom: 12 }}>WEBSITE VISIBILITY</div>
+                <WebsiteToggle vehicleId={vehicle.id} initialValue={vehicle.show_on_website} vehicleStatus={vehicle.status} />
+              </div>
+            )}
 
             {/* Status change */}
-            {transitions.length > 0 && isManager && (
+            {transitionOptions.length > 0 && (
               <div style={{ background: '#0d1117', border: '1px solid #1f2d45', borderRadius: 12, padding: 18 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#5c7090', letterSpacing: '0.08em', marginBottom: 12 }}>CHANGE STATUS</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#5c7090', letterSpacing: '0.08em', marginBottom: 12 }}>
+                  CHANGE STATUS
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {transitions.map(s => {
-                    const isDanger   = DANGER_STATUSES.has(s);
-                    const isReversal = vehicle.status === 'sold' && REVERSAL_STATUSES.has(s);
-                    const btnStyle: React.CSSProperties = isReversal ? {
-                      background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
-                      color: '#f59e0b',
-                    } : isDanger ? {
-                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-                      color: '#ef4444',
-                    } : {
-                      background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-                      color: '#818cf8',
-                    };
-                    return (
-                      <button key={s} onClick={() => void handleStatusChange(s)} disabled={statusLoading} style={{
-                        width: '100%', padding: '9px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
-                        cursor: statusLoading ? 'not-allowed' : 'pointer',
-                        opacity: statusLoading ? 0.7 : 1, textAlign: 'left',
-                        ...btnStyle,
-                      }}>
-                        {isReversal ? '↩ ' : isDanger ? '⚠ ' : ''}{STATUS_LABELS[s] ?? s}
+                  {transitionOptions.map(opt => (
+                    <div key={opt.status} title={!opt.canDo ? opt.blockedMsg : undefined}>
+                      <button
+                        onClick={() => void handleStatusChange(opt)}
+                        disabled={statusLoading || !opt.canDo}
+                        style={{
+                          width: '100%', padding: '9px 14px', borderRadius: 8,
+                          fontSize: 12, fontWeight: 700, textAlign: 'left',
+                          cursor: (statusLoading || !opt.canDo) ? 'not-allowed' : 'pointer',
+                          opacity: (statusLoading || !opt.canDo) ? 0.45 : 1,
+                          ...VARIANT_STYLES[opt.variant],
+                        }}
+                      >
+                        {opt.label}
+                        {!opt.canDo && <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.7 }}>🔒 No permission</span>}
                       </button>
-                    );
-                  })}
+                      {!opt.canDo && opt.blockedMsg && (
+                        <div style={{ fontSize: 10, color: '#5c7090', marginTop: 3, paddingLeft: 4 }}>
+                          {opt.blockedMsg}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -244,7 +353,7 @@ export default function VehicleDetailPage({ params }: Props) {
                 { label: 'Transmission', value: formatTransmission(vehicle.transmission)  },
                 { label: 'Mileage',      value: formatMileage(vehicle.mileage)            },
                 { label: 'Color',        value: vehicle.color                             },
-                { label: 'Purchase',     value: vehicle.purchase_type                     },
+                { label: 'Purchase',     value: formatLabel(vehicle.purchase_type)        },
               ].map(item => (
                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 8, marginBottom: 8, borderBottom: '1px solid #111827', fontSize: 12 }}>
                   <span style={{ color: '#5c7090' }}>{item.label}</span>
@@ -252,6 +361,7 @@ export default function VehicleDetailPage({ params }: Props) {
                 </div>
               ))}
             </div>
+
           </div>
         </div>
       </div>
@@ -265,7 +375,12 @@ export default function VehicleDetailPage({ params }: Props) {
   );
 }
 
-function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
+// ─────────────────────────────────────────────────────────────
+// SUB-COMPONENTS
+// ─────────────────────────────────────────────────────────────
+
+function KpiCard({ label, value, color, hidden }: { label: string; value: string; color: string; hidden?: boolean }) {
+  if (hidden) return null;
   return (
     <div style={{ background: '#0d1117', border: '1px solid #1f2d45', borderRadius: 10, padding: '16px 18px' }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: '#5c7090', letterSpacing: '0.08em', marginBottom: 6 }}>{label.toUpperCase()}</div>
@@ -279,39 +394,39 @@ function DetailsTab({ vehicle }: { vehicle: AdminVehicle }) {
     {
       title: 'Basic Information',
       fields: [
-        { label: 'Make',            value: vehicle.make             },
-        { label: 'Model',           value: vehicle.model            },
-        { label: 'Variant',         value: vehicle.variant          },
-        { label: 'Year',            value: String(vehicle.year)     },
-        { label: 'Color',           value: vehicle.color            },
-        { label: 'Body Type',       value: formatLabel(vehicle.body_type) },
-        { label: 'Condition',       value: formatCondition(vehicle.condition) },
-        { label: 'Location',        value: vehicle.location         },
+        { label: 'Make',      value: vehicle.make               },
+        { label: 'Model',     value: vehicle.model              },
+        { label: 'Variant',   value: vehicle.variant            },
+        { label: 'Year',      value: String(vehicle.year)       },
+        { label: 'Color',     value: vehicle.color              },
+        { label: 'Body Type', value: formatLabel(vehicle.body_type) },
+        { label: 'Condition', value: formatCondition(vehicle.condition) },
+        { label: 'Location',  value: vehicle.location           },
       ],
     },
     {
       title: 'Specifications',
       fields: [
-        { label: 'Mileage',         value: formatMileage(vehicle.mileage) },
-        { label: 'Engine',          value: vehicle.engine_capacity   },
-        { label: 'Transmission',    value: formatTransmission(vehicle.transmission) },
-        { label: 'Fuel Type',       value: formatFuelType(vehicle.fuel_type) },
+        { label: 'Mileage',      value: formatMileage(vehicle.mileage)             },
+        { label: 'Engine',       value: vehicle.engine_capacity                    },
+        { label: 'Transmission', value: formatTransmission(vehicle.transmission)   },
+        { label: 'Fuel Type',    value: formatFuelType(vehicle.fuel_type)          },
       ],
     },
     {
       title: 'Identification',
       fields: [
-        { label: 'Chassis / VIN',   value: vehicle.chassis_vin      },
-        { label: 'Reg. Number',     value: vehicle.registration_number },
+        { label: 'Chassis / VIN', value: vehicle.chassis_vin          },
+        { label: 'Reg. Number',   value: vehicle.registration_number  },
       ],
     },
     {
       title: 'Purchase Information',
       fields: [
-        { label: 'Purchase Date',   value: vehicle.purchase_date    },
-        { label: 'Supplier',        value: vehicle.supplier_name    },
-        { label: 'Purchase Type',   value: formatLabel(vehicle.purchase_type) },
-        { label: 'Purchase Price',  value: formatPrice(vehicle.purchase_price) },
+        { label: 'Purchase Date',   value: vehicle.purchase_date                     },
+        { label: 'Supplier',        value: vehicle.supplier_name                     },
+        { label: 'Purchase Type',   value: formatLabel(vehicle.purchase_type)        },
+        { label: 'Purchase Price',  value: formatPrice(vehicle.purchase_price)       },
         { label: 'Payment Status',  value: formatLabel(vehicle.purchase_payment_status) },
       ],
     },
