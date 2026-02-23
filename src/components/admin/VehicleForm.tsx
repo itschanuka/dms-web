@@ -151,7 +151,12 @@ export default function VehicleForm({ initial = {}, mode }: Props) {
       body_type:               form.body_type,
       condition:               form.condition,
       location:                form.location,
-      chassis_vin:             form.chassis_vin,
+      // Only send chassis_vin on create, or on edit if user actually changed it.
+      // This prevents the DB unique constraint firing on unchanged edits when
+      // a soft-deleted vehicle has the same VIN.
+      ...(mode === 'create' || form.chassis_vin !== (initial.chassis_vin ?? '')
+        ? { chassis_vin: form.chassis_vin }
+        : {}),
       registration_number:     form.registration_number || undefined,
       purchase_date:           form.purchase_date,
       supplier_name:           form.supplier_name  || undefined,
