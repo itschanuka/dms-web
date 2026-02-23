@@ -1,18 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-const NAV = [
-  { href: '/admin/dashboard',  icon: '📊', label: 'Dashboard'  },
-  { href: '/admin/inventory',  icon: '🚗', label: 'Inventory'  },
-  { href: '/admin/crm',        icon: '📋', label: 'CRM'        },
-  { href: '/admin/deals',      icon: '🤝', label: 'Deals'      },
-  { href: '/admin/customers',  icon: '👤', label: 'Customers'  },
-  { href: '/admin/employees',  icon: '👥', label: 'Employees'  },
-  { href: '/admin/reports',    icon: '📈', label: 'Reports'    },
+// ── Module definitions ────────────────────────────────────────
+
+interface NavModule {
+  href:    string;
+  icon:    string;
+  label:   string;
+  color:   string;         // accent color for active state
+  badge?:  string;         // optional badge text (e.g. 'New')
+}
+
+const MODULES: NavModule[] = [
+  { href: '/admin',           icon: '⬡',  label: 'Dashboard',  color: '#6366f1' },
+  { href: '/admin/inventory', icon: '🚗', label: 'Inventory',  color: '#0ea5e9' },
+  { href: '/admin/crm',       icon: '📋', label: 'CRM',        color: '#10b981' },
+  { href: '/admin/deals',     icon: '🤝', label: 'Deals',      color: '#f59e0b' },
+  { href: '/admin/customers', icon: '👤', label: 'Customers',  color: '#8b5cf6' },
+  { href: '/admin/employees', icon: '👥', label: 'Employees',  color: '#ec4899' },
+  { href: '/admin/reports',   icon: '📈', label: 'Reports',    color: '#ef4444' },
 ];
 
 interface Props {
@@ -20,200 +30,406 @@ interface Props {
 }
 
 export default function AdminShell({ children }: Props) {
-  const pathname = usePathname();
-  const router   = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [userEmail,   setUserEmail]   = useState('');
+  const pathname   = usePathname();
+  const router     = useRouter();
+  const scrollRef  = useRef<HTMLDivElement>(null);
+  const [userEmail,    setUserEmail]    = useState('');
+  const [userName,     setUserName]     = useState('');
+  const [userRole,     setUserRole]     = useState('');
+  const [profileOpen,  setProfileOpen]  = useState(false);
+  const [scrolled,     setScrolled]     = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
-      setUserEmail(data.user?.email ?? '');
+      const email = data.user?.email ?? '';
+      setUserEmail(email);
     });
+
+    // Try to get employee profile from localStorage cache or session
+    const cached = sessionStorage.getItem('dms_employee_name');
+    const cachedRole = sessionStorage.getItem('dms_employee_role');
+    if (cached)     setUserName(cached);
+    if (cachedRole) setUserRole(cachedRole);
+  }, []);
+
+  // Track content scroll for subtle header shadow
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = () => setScrolled(el.scrollTop > 4);
+    el.addEventListener('scroll', handler, { passive: true });
+    return () => el.removeEventListener('scroll', handler);
   }, []);
 
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
+    sessionStorage.clear();
     router.push('/admin/login');
   }
 
-  return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#07090f' }}>
+  // Determine active module
+  function isActive(mod: NavModule) {
+    if (mod.href === '/admin') {
+      return pathname === '/admin' || pathname === '/admin/dashboard';
+    }
+    return pathname.startsWith(mod.href);
+  }
 
-      {/* ── Sidebar ────────────────────────────────────────── */}
-      <aside style={{
-        width:         240,
-        background:    '#0d1117',
-        borderRight:   '1px solid #1f2d45',
-        display:       'flex',
-        flexDirection: 'column',
-        position:      'fixed',
-        top:           0,
-        left:          sidebarOpen ? 0 : -240,
-        height:        '100vh',
-        zIndex:        200,
-        transition:    'left 0.25s ease',
-      }}
-      className="admin-sidebar"
-      >
-        {/* Logo */}
-        <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid #1f2d45' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32, height: 32,
-              background: 'linear-gradient(135deg, #6366f1, #0ea5e9)',
-              borderRadius: 8,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 14, fontWeight: 900, color: '#fff', flexShrink: 0,
-            }}>A</div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', lineHeight: 1 }}>Auto Prime</div>
-              <div style={{ fontSize: 10, color: '#5c7090', marginTop: 2 }}>Admin Panel</div>
+  const activeModule = MODULES.find(m => isActive(m)) ?? MODULES[0]!;
+  const displayName  = userName || userEmail.split('@')[0] || 'User';
+  const initials     = displayName.slice(0, 2).toUpperCase();
+
+  return (
+    <div style={{
+      display:       'flex',
+      flexDirection: 'column',
+      minHeight:     '100vh',
+      background:    '#070a12',
+      fontFamily:    "'Geist', 'DM Sans', ui-sans-serif, system-ui, sans-serif",
+    }}>
+
+      {/* ══════════════════════════════════════════════════════
+          TOP HEADER — Brand + User
+      ══════════════════════════════════════════════════════ */}
+      <header style={{
+        height:          52,
+        background:      '#0b0f1a',
+        borderBottom:    '1px solid #131b2e',
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'space-between',
+        padding:         '0 20px',
+        position:        'sticky',
+        top:             0,
+        zIndex:          300,
+        flexShrink:      0,
+      }}>
+        {/* Left — Logo */}
+        <Link href="/admin" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width:          30,
+            height:         30,
+            background:     'linear-gradient(135deg, #6366f1 0%, #0ea5e9 100%)',
+            borderRadius:   7,
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: 'center',
+            fontSize:       13,
+            fontWeight:     900,
+            color:          '#fff',
+            letterSpacing:  '-0.5px',
+            flexShrink:     0,
+            boxShadow:      '0 0 18px rgba(99,102,241,0.35)',
+          }}>A</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', lineHeight: 1, letterSpacing: '-0.3px' }}>
+              Auto Prime
+            </div>
+            <div style={{ fontSize: 10, color: '#3d5070', marginTop: 1, letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+              Admin Console
             </div>
           </div>
-        </div>
+        </Link>
 
-        {/* Nav links */}
-        <nav style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
-          {NAV.map(link => {
-            const isActive = link.href === '/admin/dashboard'
-              ? pathname === '/admin/dashboard' || pathname === '/admin'
-              : pathname.startsWith(link.href);
+        {/* Right — User profile */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
+          <Link href="/" target="_blank" style={{
+            fontSize: 11, color: '#3d5070', textDecoration: 'none',
+            padding: '4px 10px', border: '1px solid #1a2540',
+            borderRadius: 20, transition: 'all 0.15s',
+          }}
+            onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#8097b8'; (e.currentTarget as HTMLAnchorElement).style.borderColor = '#253550'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#3d5070'; (e.currentTarget as HTMLAnchorElement).style.borderColor = '#1a2540'; }}
+          >
+            View Site ↗
+          </Link>
+
+          {/* Avatar button */}
+          <button
+            onClick={() => setProfileOpen(o => !o)}
+            style={{
+              display:        'flex',
+              alignItems:     'center',
+              gap:            8,
+              background:     profileOpen ? 'rgba(99,102,241,0.12)' : 'transparent',
+              border:         `1px solid ${profileOpen ? 'rgba(99,102,241,0.3)' : '#1a2540'}`,
+              borderRadius:   24,
+              padding:        '4px 10px 4px 4px',
+              cursor:         'pointer',
+              transition:     'all 0.15s',
+            }}
+          >
+            <div style={{
+              width:          26,
+              height:         26,
+              borderRadius:   '50%',
+              background:     `linear-gradient(135deg, ${activeModule.color}33, ${activeModule.color}66)`,
+              border:         `1.5px solid ${activeModule.color}55`,
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+              fontSize:       10,
+              fontWeight:     800,
+              color:          activeModule.color,
+            }}>{initials}</div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#c4d0e4', lineHeight: 1 }}>{displayName}</div>
+              {userRole && (
+                <div style={{ fontSize: 10, color: '#3d5070', marginTop: 1, textTransform: 'capitalize' }}>{userRole}</div>
+              )}
+            </div>
+            <span style={{ fontSize: 10, color: '#3d5070', marginLeft: 2 }}>▾</span>
+          </button>
+
+          {/* Profile dropdown */}
+          {profileOpen && (
+            <>
+              <div
+                onClick={() => setProfileOpen(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 400 }}
+              />
+              <div style={{
+                position:     'absolute',
+                top:          'calc(100% + 8px)',
+                right:        0,
+                background:   '#0d1525',
+                border:       '1px solid #1a2540',
+                borderRadius: 12,
+                padding:      8,
+                minWidth:     180,
+                zIndex:       500,
+                boxShadow:    '0 16px 48px rgba(0,0,0,0.6)',
+              }}>
+                <div style={{ padding: '8px 12px 10px', borderBottom: '1px solid #131b2e', marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#c4d0e4' }}>{displayName}</div>
+                  <div style={{ fontSize: 11, color: '#3d5070', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userEmail}</div>
+                </div>
+                <DropdownItem href="/admin/settings" label="Settings" icon="⚙" />
+                <DropdownItem href="/admin/change-password" label="Change Password" icon="🔑" />
+                <div style={{ height: 1, background: '#131b2e', margin: '6px 0' }} />
+                <button
+                  onClick={handleSignOut}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 12px', borderRadius: 7, background: 'none', border: 'none',
+                    fontSize: 12, fontWeight: 600, color: '#ef4444', cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <span>🚪</span> Sign Out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* ══════════════════════════════════════════════════════
+          MODULE NAV BAR — The separate navigation header
+      ══════════════════════════════════════════════════════ */}
+      <nav style={{
+        background:   '#0b0f1a',
+        borderBottom: scrolled ? '1px solid #1a2540' : '1px solid #0f1524',
+        position:     'sticky',
+        top:          52,
+        zIndex:       200,
+        flexShrink:   0,
+        boxShadow:    scrolled ? '0 4px 24px rgba(0,0,0,0.4)' : 'none',
+        transition:   'box-shadow 0.2s, border-color 0.2s',
+      }}>
+        {/* Scrollable module tabs */}
+        <div style={{
+          display:         'flex',
+          alignItems:      'stretch',
+          overflowX:       'auto',
+          scrollbarWidth:  'none',
+          maxWidth:        1400,
+          margin:          '0 auto',
+          padding:         '0 16px',
+        }}
+          className="hide-scrollbar"
+        >
+          {MODULES.map(mod => {
+            const active = isActive(mod);
             return (
               <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setSidebarOpen(false)}
+                key={mod.href}
+                href={mod.href}
                 style={{
                   display:        'flex',
                   alignItems:     'center',
-                  gap:            10,
-                  padding:        '9px 12px',
-                  borderRadius:   8,
-                  fontSize:       13,
-                  fontWeight:     isActive ? 700 : 500,
-                  color:          isActive ? '#fff' : '#8097b8',
-                  background:     isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
+                  gap:            7,
+                  padding:        '0 14px',
+                  height:         44,
+                  fontSize:       12.5,
+                  fontWeight:     active ? 700 : 500,
+                  color:          active ? mod.color : '#4a6080',
                   textDecoration: 'none',
-                  marginBottom:   2,
-                  transition:     'all 0.15s',
-                  borderLeft:     isActive ? '3px solid #6366f1' : '3px solid transparent',
+                  borderBottom:   active ? `2px solid ${mod.color}` : '2px solid transparent',
+                  background:     active ? `${mod.color}0d` : 'transparent',
+                  whiteSpace:     'nowrap',
+                  transition:     'all 0.15s ease',
+                  position:       'relative',
+                  flexShrink:     0,
+                }}
+                onMouseEnter={e => {
+                  if (!active) {
+                    const el = e.currentTarget as HTMLAnchorElement;
+                    el.style.color = '#8097b8';
+                    el.style.background = 'rgba(255,255,255,0.03)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!active) {
+                    const el = e.currentTarget as HTMLAnchorElement;
+                    el.style.color = '#4a6080';
+                    el.style.background = 'transparent';
+                  }
                 }}
               >
-                <span style={{ fontSize: 16 }}>{link.icon}</span>
-                {link.label}
+                {/* Icon */}
+                <span style={{
+                  fontSize:       active ? 14 : 13,
+                  filter:         active ? 'none' : 'grayscale(0.6)',
+                  transition:     'all 0.15s',
+                }}>{mod.icon}</span>
+
+                {/* Label */}
+                {mod.label}
+
+                {/* Badge */}
+                {mod.badge && (
+                  <span style={{
+                    fontSize:       9,
+                    fontWeight:     800,
+                    color:          '#fff',
+                    background:     mod.color,
+                    borderRadius:   10,
+                    padding:        '1px 5px',
+                    letterSpacing:  '0.3px',
+                    textTransform:  'uppercase',
+                  }}>{mod.badge}</span>
+                )}
+
+                {/* Active dot indicator */}
+                {active && (
+                  <span style={{
+                    width:          5,
+                    height:         5,
+                    borderRadius:   '50%',
+                    background:     mod.color,
+                    marginLeft:     2,
+                    boxShadow:      `0 0 6px ${mod.color}`,
+                    flexShrink:     0,
+                  }} />
+                )}
               </Link>
             );
           })}
-        </nav>
-
-        {/* User + logout */}
-        <div style={{ padding: '12px 10px', borderTop: '1px solid #1f2d45' }}>
-          <div style={{ fontSize: 11, color: '#5c7090', padding: '0 12px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {userEmail}
-          </div>
-          <button onClick={handleSignOut} style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-            padding: '9px 12px', borderRadius: 8,
-            background: 'none', border: 'none',
-            fontSize: 13, fontWeight: 600,
-            color: '#ef4444', cursor: 'pointer',
-            textAlign: 'left',
-          }}>
-            🚪 Sign Out
-          </button>
         </div>
-      </aside>
+      </nav>
 
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-            zIndex: 199, display: 'none',
-          }}
-          className="sidebar-overlay"
-        />
-      )}
-
-      {/* ── Main area ──────────────────────────────────────── */}
-      <div style={{ flex: 1, marginLeft: 240, display: 'flex', flexDirection: 'column', minHeight: '100vh' }} className="admin-main">
-
-        {/* Top bar */}
-        <header style={{
-          height:         56,
-          background:     '#0d1117',
-          borderBottom:   '1px solid #1f2d45',
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'space-between',
-          padding:        '0 20px',
-          position:       'sticky',
-          top:            0,
-          zIndex:         100,
+      {/* ══════════════════════════════════════════════════════
+          CONTENT AREA
+      ══════════════════════════════════════════════════════ */}
+      <div
+        ref={scrollRef}
+        style={{
+          flex:     1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}
+      >
+        {/* Page context bar — breadcrumb + module accent */}
+        <div style={{
+          background:    '#08101c',
+          borderBottom:  '1px solid #0f1a2e',
+          padding:       '10px 24px',
+          display:       'flex',
+          alignItems:    'center',
+          gap:           10,
         }}>
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="sidebar-toggle"
-            style={{
-              background: 'none', border: '1px solid #1f2d45',
-              borderRadius: 6, padding: '5px 8px',
-              cursor: 'pointer', color: '#8097b8', fontSize: 16,
-              display: 'none',
-            }}
-          >
-            ☰
-          </button>
+          {/* Module color stripe */}
+          <div style={{
+            width:        3,
+            height:       16,
+            borderRadius: 3,
+            background:   activeModule.color,
+            boxShadow:    `0 0 8px ${activeModule.color}80`,
+            flexShrink:   0,
+          }} />
+          <span style={{ fontSize: 12, color: '#c4d0e4', fontWeight: 600 }}>
+            {activeModule.label}
+          </span>
+          {getSubPath(pathname, activeModule) && (
+            <>
+              <span style={{ fontSize: 11, color: '#253550' }}>›</span>
+              <span style={{ fontSize: 12, color: '#4a6080' }}>
+                {getSubPath(pathname, activeModule)}
+              </span>
+            </>
+          )}
+        </div>
 
-          {/* Breadcrumb hint */}
-          <div style={{ fontSize: 13, color: '#5c7090' }}>
-            {getPageTitle(pathname)}
-          </div>
-
-          {/* Right side */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Link href="/" target="_blank" style={{ fontSize: 12, color: '#5c7090', textDecoration: 'none' }}>
-              View Site ↗
-            </Link>
-            <div style={{
-              width: 30, height: 30, borderRadius: '50%',
-              background: 'rgba(99,102,241,0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 14, color: '#818cf8', fontWeight: 700,
-            }}>
-              {userEmail.charAt(0).toUpperCase()}
-            </div>
-          </div>
-        </header>
-
-        {/* Page content */}
-        <main style={{ flex: 1, padding: 0 }}>
+        {/* Actual page content */}
+        <main>
           {children}
         </main>
       </div>
 
       <style>{`
-        @media (max-width: 1024px) {
-          .admin-sidebar { left: -240px !important; }
-          .admin-sidebar.open { left: 0 !important; }
-          .admin-main { margin-left: 0 !important; }
-          .sidebar-toggle { display: flex !important; }
-          .sidebar-overlay { display: block !important; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @media (max-width: 640px) {
+          .admin-nav-label { display: none; }
         }
       `}</style>
     </div>
   );
 }
 
-function getPageTitle(pathname: string): string {
-  if (pathname.startsWith('/admin/inventory')) return '🚗 Inventory';
-  if (pathname.startsWith('/admin/crm'))       return '📋 CRM';
-  if (pathname.startsWith('/admin/deals'))     return '🤝 Deals';
-  if (pathname.startsWith('/admin/customers')) return '👤 Customers';
-  if (pathname.startsWith('/admin/employees')) return '👥 Employees';
-  if (pathname.startsWith('/admin/reports'))   return '📈 Reports';
-  return '📊 Dashboard';
+// ── Helper components ─────────────────────────────────────────
+
+function DropdownItem({ href, label, icon }: { href: string; label: string; icon: string }) {
+  return (
+    <Link href={href} style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '8px 12px', borderRadius: 7,
+      fontSize: 12, fontWeight: 500, color: '#8097b8', textDecoration: 'none',
+      transition: 'all 0.12s',
+    }}
+      onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLAnchorElement).style.color = '#c4d0e4'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = '#8097b8'; }}
+    >
+      <span>{icon}</span> {label}
+    </Link>
+  );
+}
+
+// ── Utilities ─────────────────────────────────────────────────
+
+function getSubPath(pathname: string, activeModule: NavModule): string | null {
+  const relative = pathname.slice(activeModule.href.length);
+  if (!relative || relative === '/') return null;
+
+  const segments = relative.split('/').filter(Boolean);
+  const first = segments[0];
+  if (!first) return null;
+
+  // Human-readable mappings
+  const MAP: Record<string, string> = {
+    new:  'Add New',
+    edit: 'Edit',
+  };
+
+  if (MAP[first]) return MAP[first];
+
+  // If it looks like a UUID, show "Detail"
+  if (/^[0-9a-f-]{36}$/i.test(first)) {
+    return segments[1] === 'edit' ? 'Edit' : 'Detail';
+  }
+
+  return first.charAt(0).toUpperCase() + first.slice(1);
 }
