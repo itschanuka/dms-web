@@ -143,7 +143,6 @@ async function publicFetch<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  // createClient() returns a fresh browser Supabase client each call
   const supabase = createClient();
   const { data } = await supabase.auth.getSession();
   const token    = data.session?.access_token;
@@ -263,20 +262,20 @@ export const adminApi = {
   getAnalytics: (from: string, to: string) => {
     const qs = new URLSearchParams({ from, to });
     return adminFetch<{
-      period:           { from: string; to: string };
-      totalVehicles:    number;
-      statusCounts:     Record<string, number>;
-      availableCount:   number;
-      inventoryValue:   number;
+      period:            { from: string; to: string };
+      totalVehicles:     number;
+      statusCounts:      Record<string, number>;
+      availableCount:    number;
+      inventoryValue:    number;
       inventoryCostBase: number;
-      inventoryProfit:  number;
-      addedInPeriod:    number;
-      soldInPeriod:     number;
-      revenueInPeriod:  number;
-      costInPeriod:     number;
-      profitInPeriod:   number;
-      agingBreakdown:   { fresh: number; aging: number; old: number; dead_stock: number };
-      monthlyTrend:     Array<{ month: string; added: number; sold: number }>;
+      inventoryProfit:   number;
+      addedInPeriod:     number;
+      soldInPeriod:      number;
+      revenueInPeriod:   number;
+      costInPeriod:      number;
+      profitInPeriod:    number;
+      agingBreakdown:    { fresh: number; aging: number; old: number; dead_stock: number };
+      monthlyTrend:      Array<{ month: string; added: number; sold: number }>;
     }>(`/inventory/analytics?${qs.toString()}`);
   },
 
