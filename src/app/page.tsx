@@ -1,7 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import PublicHeader from '@/components/public/PublicHeader';
-import PublicFooter from '@/components/public/PublicFooter';
 import { DEALERSHIP } from '@/lib/constants';
 
 export const metadata: Metadata = {
@@ -13,869 +11,789 @@ export default function HomePage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Outfit:wght@200;300;400;500;600&display=swap');
 
-        :root {
-          --blue-deep:    #0a1628;
-          --blue-mid:     #1d4ed8;
-          --blue-light:   #3b82f6;
-          --blue-glow:    #60a5fa;
-          --white:        #ffffff;
-          --off-white:    #e8eef8;
-          --dark:         #04060c;
-          --text-muted:   #4a6080;
-          --border:       rgba(255,255,255,0.07);
-        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        [data-theme='light'] {
-          --blue-deep:    #eff6ff;
-          --blue-mid:     #1d4ed8;
-          --blue-light:   #2563eb;
-          --blue-glow:    #1d4ed8;
-          --white:        #0f1923;
-          --off-white:    #1e2d3d;
-          --dark:         #f8faff;
-          --text-muted:   #607090;
-          --border:       rgba(0,0,0,0.08);
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        /* ── Hero ── */
-        .hp-hero {
+        /* ─── HERO ─────────────────────────────────────────── */
+        .h-hero {
           position: relative;
-          min-height: 100svh;
-          display: flex;
-          align-items: center;
-          overflow: hidden;
-          background: #04060c;
-        }
-
-        /* Animated gradient orbs */
-        .hp-orb {
-          position: absolute;
-          border-radius: 50%;
-          filter: blur(80px);
-          pointer-events: none;
-        }
-        .hp-orb-1 {
-          width: 600px; height: 600px;
-          background: radial-gradient(circle, rgba(29,78,216,0.35) 0%, transparent 70%);
-          top: -10%; left: -5%;
-          animation: hp-float1 12s ease-in-out infinite;
-        }
-        .hp-orb-2 {
-          width: 400px; height: 400px;
-          background: radial-gradient(circle, rgba(96,165,250,0.2) 0%, transparent 70%);
-          bottom: 10%; right: 5%;
-          animation: hp-float2 15s ease-in-out infinite;
-        }
-        .hp-orb-3 {
-          width: 300px; height: 300px;
-          background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%);
-          top: 50%; left: 40%;
-          animation: hp-float3 18s ease-in-out infinite;
-        }
-
-        @keyframes hp-float1 {
-          0%, 100% { transform: translate(0,0) scale(1); }
-          50%       { transform: translate(40px, 30px) scale(1.1); }
-        }
-        @keyframes hp-float2 {
-          0%, 100% { transform: translate(0,0) scale(1); }
-          50%       { transform: translate(-30px, -40px) scale(0.95); }
-        }
-        @keyframes hp-float3 {
-          0%, 100% { transform: translate(0,0); }
-          33%       { transform: translate(20px, -20px); }
-          66%       { transform: translate(-20px, 10px); }
-        }
-
-        /* Fine grain texture overlay */
-        .hp-hero::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-          pointer-events: none;
-          z-index: 1;
-          opacity: 0.4;
-        }
-
-        /* Horizontal lines grid */
-        .hp-hero::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background-image:
-            linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
-          background-size: 60px 60px;
-          pointer-events: none;
-          z-index: 1;
-        }
-
-        .hp-hero-inner {
-          position: relative;
-          z-index: 2;
           width: 100%;
-          max-width: 1280px;
+          height: 100svh;
+          min-height: 640px;
+          overflow: hidden;
+          display: flex;
+          align-items: flex-end;
+        }
+
+        .h-hero-bg {
+          position: absolute;
+          inset: 0;
+          background-image: url('https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=2400&q=85');
+          background-size: cover;
+          background-position: center 40%;
+          transform: scale(1.04);
+          animation: h-zoom 18s ease-out forwards;
+        }
+
+        @keyframes h-zoom {
+          from { transform: scale(1.04); }
+          to   { transform: scale(1.0);  }
+        }
+
+        .h-hero-overlay {
+          position: absolute;
+          inset: 0;
+          background:
+            linear-gradient(to top,
+              rgba(2, 4, 10, 0.97) 0%,
+              rgba(2, 4, 10, 0.75) 35%,
+              rgba(2, 4, 10, 0.25) 65%,
+              rgba(2, 4, 10, 0.05) 100%
+            ),
+            linear-gradient(to right,
+              rgba(2, 4, 10, 0.6) 0%,
+              transparent 60%
+            );
+        }
+
+        .h-hero-vignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%);
+          pointer-events: none;
+        }
+
+        .h-hero-lines {
+          position: absolute;
+          inset: 0;
+          background-image: repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 3px,
+            rgba(255,255,255,0.012) 3px,
+            rgba(255,255,255,0.012) 4px
+          );
+          pointer-events: none;
+        }
+
+        .h-hero-inner {
+          position: relative;
+          z-index: 10;
+          width: 100%;
+          max-width: 1360px;
           margin: 0 auto;
-          padding: 100px 28px 80px;
+          padding: 0 48px 80px;
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 60px;
-          align-items: center;
+          gap: 40px;
+          align-items: end;
         }
 
-        /* Glass card */
-        .hp-glass-card {
-          background: rgba(255,255,255,0.04);
-          backdrop-filter: blur(24px);
-          -webkit-backdrop-filter: blur(24px);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 20px;
-          padding: 44px 48px;
-          box-shadow:
-            0 0 0 1px rgba(255,255,255,0.02) inset,
-            0 32px 80px rgba(0,0,0,0.4),
-            0 0 60px rgba(29,78,216,0.08);
-        }
-
-        .hp-eyebrow {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          color: #60a5fa;
-          display: flex;
+        .h-tag {
+          display: inline-flex;
           align-items: center;
           gap: 10px;
-          margin-bottom: 20px;
+          font-family: 'Outfit', sans-serif;
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 0.28em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.45);
+          margin-bottom: 28px;
+          animation: h-fade-up 0.8s ease 0.2s both;
         }
-        .hp-eyebrow::before {
-          content: '';
-          display: block;
-          width: 24px;
-          height: 1px;
-          background: #3b82f6;
+        .h-tag-line {
+          width: 32px; height: 1px;
+          background: linear-gradient(90deg, #3b82f6, transparent);
         }
 
-        .hp-headline {
-          font-family: 'Cormorant Garamond', Georgia, serif;
-          font-size: clamp(40px, 5vw, 64px);
-          font-weight: 700;
-          line-height: 1.05;
+        .h-headline {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: clamp(52px, 7vw, 96px);
+          font-weight: 900;
+          line-height: 0.95;
+          letter-spacing: -0.02em;
           color: #ffffff;
-          margin-bottom: 22px;
-          letter-spacing: -0.01em;
+          margin-bottom: 28px;
+          animation: h-fade-up 0.9s ease 0.35s both;
         }
-        .hp-headline em {
+        .h-headline-outline {
           font-style: italic;
-          color: #60a5fa;
+          font-weight: 700;
+          color: transparent;
+          -webkit-text-stroke: 1.5px rgba(255,255,255,0.6);
         }
 
-        .hp-subline {
-          font-family: 'DM Sans', sans-serif;
+        .h-sub {
+          font-family: 'Outfit', sans-serif;
           font-size: 16px;
           font-weight: 300;
-          line-height: 1.75;
+          line-height: 1.8;
           color: rgba(255,255,255,0.5);
-          margin-bottom: 36px;
-          max-width: 420px;
+          max-width: 380px;
+          margin-bottom: 40px;
+          animation: h-fade-up 0.9s ease 0.5s both;
         }
 
-        .hp-cta-row {
+        .h-cta-row {
           display: flex;
-          gap: 12px;
+          gap: 14px;
           flex-wrap: wrap;
+          animation: h-fade-up 0.9s ease 0.65s both;
         }
 
-        .hp-btn-primary {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 13px;
+        .h-btn-solid {
+          font-family: 'Outfit', sans-serif;
+          font-size: 12px;
           font-weight: 600;
-          letter-spacing: 0.07em;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
           text-decoration: none;
-          padding: 14px 28px;
-          border-radius: 8px;
+          padding: 15px 32px;
+          border-radius: 4px;
           background: #1d4ed8;
-          color: #ffffff;
-          border: 1px solid transparent;
+          color: #fff;
+          border: 1px solid #1d4ed8;
           transition: all 0.22s ease;
           display: inline-flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
           white-space: nowrap;
         }
-        .hp-btn-primary:hover {
+        .h-btn-solid:hover {
           background: #2563eb;
-          box-shadow: 0 8px 28px rgba(29,78,216,0.45);
+          border-color: #2563eb;
+          box-shadow: 0 0 40px rgba(29,78,216,0.5);
           transform: translateY(-1px);
         }
 
-        .hp-btn-ghost {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 13px;
+        .h-btn-outline {
+          font-family: 'Outfit', sans-serif;
+          font-size: 12px;
           font-weight: 500;
-          letter-spacing: 0.07em;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
           text-decoration: none;
-          padding: 14px 24px;
-          border-radius: 8px;
-          background: transparent;
-          color: rgba(255,255,255,0.6);
-          border: 1px solid rgba(255,255,255,0.15);
+          padding: 15px 28px;
+          border-radius: 4px;
+          background: rgba(255,255,255,0.06);
+          backdrop-filter: blur(8px);
+          color: rgba(255,255,255,0.7);
+          border: 1px solid rgba(255,255,255,0.18);
           transition: all 0.22s ease;
           display: inline-flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
           white-space: nowrap;
         }
-        .hp-btn-ghost:hover {
+        .h-btn-outline:hover {
+          background: rgba(255,255,255,0.1);
           border-color: rgba(255,255,255,0.35);
-          color: #ffffff;
+          color: #fff;
+        }
+
+        /* Glass panel right side */
+        .h-hero-panel {
           background: rgba(255,255,255,0.05);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 12px;
+          padding: 32px 28px;
+          animation: h-fade-up 0.9s ease 0.55s both;
         }
-
-        /* Hero visual — right side */
-        .hp-hero-visual {
-          position: relative;
-          height: 480px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+        .h-panel-title {
+          font-family: 'Outfit', sans-serif;
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.3);
+          margin-bottom: 18px;
+          padding-bottom: 14px;
+          border-bottom: 1px solid rgba(255,255,255,0.07);
         }
-
-        .hp-car-silhouette {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
+        .h-panel-stats {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1px;
+          background: rgba(255,255,255,0.06);
+          border-radius: 8px;
+          overflow: hidden;
+          margin-bottom: 18px;
         }
-
-        /* Animated car SVG */
-        .hp-car-glow {
-          position: absolute;
-          width: 70%;
-          height: 40%;
-          bottom: 18%;
-          left: 50%;
-          transform: translateX(-50%);
-          background: radial-gradient(ellipse, rgba(29,78,216,0.4) 0%, transparent 70%);
-          filter: blur(30px);
-          animation: hp-glow-pulse 3s ease-in-out infinite;
+        .h-panel-stat {
+          background: rgba(0,0,0,0.35);
+          padding: 18px 16px;
         }
-
-        @keyframes hp-glow-pulse {
-          0%, 100% { opacity: 0.6; transform: translateX(-50%) scaleX(1); }
-          50%       { opacity: 1;   transform: translateX(-50%) scaleX(1.1); }
-        }
-
-        .hp-car-svg {
-          width: 90%;
-          max-width: 500px;
-          position: relative;
-          z-index: 2;
-          filter: drop-shadow(0 20px 40px rgba(29,78,216,0.3));
-          animation: hp-car-float 6s ease-in-out infinite;
-        }
-
-        @keyframes hp-car-float {
-          0%, 100% { transform: translateY(0px); }
-          50%       { transform: translateY(-12px); }
-        }
-
-        /* Floating stats */
-        .hp-stat-chip {
-          position: absolute;
-          background: rgba(255,255,255,0.07);
-          backdrop-filter: blur(16px);
-          border: 1px solid rgba(255,255,255,0.12);
-          border-radius: 10px;
-          padding: 10px 16px;
-          font-family: 'DM Sans', sans-serif;
-          z-index: 3;
-          animation: hp-chip-float 4s ease-in-out infinite;
-        }
-        .hp-stat-chip:nth-child(3) { animation-delay: -2s; }
-        .hp-stat-chip-num {
-          font-size: 20px;
+        .h-panel-stat-num {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: 28px;
           font-weight: 700;
-          color: #ffffff;
+          color: #fff;
           line-height: 1;
         }
-        .hp-stat-chip-label {
+        .h-panel-stat-accent { color: #60a5fa; }
+        .h-panel-stat-label {
+          font-family: 'Outfit', sans-serif;
           font-size: 10px;
-          color: rgba(255,255,255,0.45);
+          font-weight: 400;
           letter-spacing: 0.08em;
           text-transform: uppercase;
-          margin-top: 2px;
+          color: rgba(255,255,255,0.28);
+          margin-top: 4px;
         }
-        @keyframes hp-chip-float {
-          0%, 100% { transform: translateY(0); }
-          50%       { transform: translateY(-6px); }
+        .h-panel-badges {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 7px;
+        }
+        .h-badge {
+          font-family: 'Outfit', sans-serif;
+          font-size: 10px;
+          font-weight: 400;
+          letter-spacing: 0.06em;
+          color: rgba(255,255,255,0.4);
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.09);
+          border-radius: 20px;
+          padding: 5px 11px;
         }
 
-        /* ── Marquee strip ── */
-        .hp-marquee-strip {
-          background: #1d4ed8;
-          overflow: hidden;
-          padding: 10px 0;
-          white-space: nowrap;
-          position: relative;
+        /* Scroll indicator */
+        .h-scroll {
+          position: absolute;
+          bottom: 36px;
+          right: 48px;
+          z-index: 10;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          animation: h-fade-up 1s ease 1s both;
         }
-        .hp-marquee-track {
-          display: inline-flex;
-          animation: hp-marquee 30s linear infinite;
-        }
-        .hp-marquee-item {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.15em;
+        .h-scroll-text {
+          font-family: 'Outfit', sans-serif;
+          font-size: 9px;
+          font-weight: 500;
+          letter-spacing: 0.2em;
           text-transform: uppercase;
-          color: rgba(255,255,255,0.8);
-          padding: 0 28px;
+          color: rgba(255,255,255,0.2);
+          writing-mode: vertical-rl;
+        }
+        .h-scroll-line {
+          width: 1px; height: 52px;
+          background: linear-gradient(to bottom, rgba(255,255,255,0.3), transparent);
+          animation: h-line-pulse 2s ease-in-out infinite;
+        }
+        @keyframes h-line-pulse {
+          0%, 100% { opacity: 0.4; }
+          50%       { opacity: 1; }
+        }
+
+        @keyframes h-fade-up {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ─── MARQUEE ──────────────────────────────────────── */
+        .h-marquee {
+          background: #060d1e;
+          border-top: 1px solid rgba(255,255,255,0.05);
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+          overflow: hidden;
+          padding: 14px 0;
+          white-space: nowrap;
+        }
+        .h-marquee-track {
+          display: inline-flex;
+          animation: h-scroll-left 35s linear infinite;
+        }
+        .h-marquee-item {
+          font-family: 'Outfit', sans-serif;
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.28);
+          padding: 0 36px;
           display: inline-flex;
           align-items: center;
-          gap: 28px;
+          gap: 36px;
         }
-        .hp-marquee-dot {
+        .h-marquee-diamond {
           width: 4px; height: 4px;
-          border-radius: 50%;
-          background: rgba(255,255,255,0.4);
+          background: #1d4ed8;
+          transform: rotate(45deg);
           flex-shrink: 0;
         }
-        @keyframes hp-marquee {
+        @keyframes h-scroll-left {
           from { transform: translateX(0); }
           to   { transform: translateX(-50%); }
         }
 
-        /* ── Why Us ── */
-        .hp-why {
-          padding: 96px 28px;
-          background: #04060c;
+        /* ─── WHY US ───────────────────────────────────────── */
+        .h-why {
+          background: #02040a;
+          padding: 112px 48px;
         }
-        .hp-section-label {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
+        .h-section-kicker {
+          font-family: 'Outfit', sans-serif;
+          font-size: 10px;
           font-weight: 600;
-          letter-spacing: 0.2em;
+          letter-spacing: 0.28em;
           text-transform: uppercase;
           color: #3b82f6;
           display: inline-flex;
           align-items: center;
-          gap: 10px;
-          margin-bottom: 16px;
+          gap: 12px;
+          margin-bottom: 18px;
         }
-        .hp-section-label::before {
+        .h-section-kicker::after {
           content: '';
-          display: inline-block;
-          width: 20px;
-          height: 1px;
+          width: 36px; height: 1px;
           background: currentColor;
+          display: inline-block;
         }
-        .hp-section-title {
-          font-family: 'Cormorant Garamond', Georgia, serif;
-          font-size: clamp(30px, 4vw, 48px);
+        .h-section-h2 {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: clamp(34px, 4.5vw, 58px);
+          font-weight: 900;
+          line-height: 1.05;
+          color: #fff;
+          letter-spacing: -0.02em;
+          margin-bottom: 64px;
+        }
+        .h-section-h2 em {
+          font-style: italic;
           font-weight: 700;
-          color: #ffffff;
-          line-height: 1.1;
-          margin-bottom: 16px;
-        }
-        .hp-section-sub {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 15px;
-          font-weight: 300;
-          color: rgba(255,255,255,0.4);
-          line-height: 1.7;
-          max-width: 500px;
+          color: rgba(255,255,255,0.35);
         }
 
-        .hp-feature-card {
-          background: rgba(255,255,255,0.025);
+        .h-cards {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 1px;
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 12px;
+          overflow: hidden;
+        }
+        .h-card {
+          background: #050912;
+          padding: 36px 28px 40px;
+          position: relative;
+          transition: background 0.25s ease;
+        }
+        .h-card::after {
+          content: '';
+          position: absolute;
+          bottom: 0; left: 0; right: 0;
+          height: 2px;
+          background: linear-gradient(90deg, #1d4ed8, #3b82f6);
+          transform: scaleX(0);
+          transform-origin: left;
+          transition: transform 0.3s ease;
+        }
+        .h-card:hover { background: #070d1a; }
+        .h-card:hover::after { transform: scaleX(1); }
+        .h-card-num {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: 11px;
+          font-style: italic;
+          color: rgba(255,255,255,0.12);
+          letter-spacing: 0.1em;
+          margin-bottom: 32px;
+        }
+        .h-card-icon { font-size: 24px; margin-bottom: 18px; display: block; }
+        .h-card-title {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: 20px;
+          font-weight: 700;
+          color: #fff;
+          margin-bottom: 12px;
+          line-height: 1.2;
+        }
+        .h-card-desc {
+          font-family: 'Outfit', sans-serif;
+          font-size: 13px;
+          font-weight: 300;
+          color: rgba(255,255,255,0.35);
+          line-height: 1.8;
+        }
+
+        /* ─── STATS ────────────────────────────────────────── */
+        .h-stats {
+          background: #030710;
+          padding: 0;
+          border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .h-stats-inner {
+          max-width: 1360px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+        }
+        .h-stat-cell {
+          padding: 56px 48px;
+          border-right: 1px solid rgba(255,255,255,0.06);
+          transition: background 0.2s;
+        }
+        .h-stat-cell:last-child { border-right: none; }
+        .h-stat-cell:hover { background: rgba(255,255,255,0.02); }
+        .h-stat-big {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: clamp(48px, 5vw, 72px);
+          font-weight: 900;
+          color: #fff;
+          line-height: 1;
+          letter-spacing: -0.03em;
+        }
+        .h-stat-blue { color: #3b82f6; }
+        .h-stat-lbl {
+          font-family: 'Outfit', sans-serif;
+          font-size: 10px;
+          font-weight: 400;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.22);
+          margin-top: 10px;
+        }
+
+        /* ─── CTA SECTION ──────────────────────────────────── */
+        .h-cta-full {
+          position: relative;
+          padding: 128px 48px;
+          background: #02040a;
+          overflow: hidden;
+          text-align: center;
+          border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .h-cta-full::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background-image: url('https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1800&q=50');
+          background-size: cover;
+          background-position: center;
+          opacity: 0.06;
+        }
+        .h-cta-full::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(ellipse at center, rgba(29,78,216,0.12) 0%, transparent 70%);
+        }
+        .h-cta-inner {
+          position: relative;
+          z-index: 1;
+          max-width: 640px;
+          margin: 0 auto;
+        }
+        .h-cta-h2 {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: clamp(36px, 5vw, 64px);
+          font-weight: 900;
+          color: #fff;
+          line-height: 1.05;
+          letter-spacing: -0.02em;
+          margin-bottom: 20px;
+        }
+        .h-cta-h2 em { font-style: italic; color: #60a5fa; }
+        .h-cta-sub {
+          font-family: 'Outfit', sans-serif;
+          font-size: 16px;
+          font-weight: 300;
+          color: rgba(255,255,255,0.38);
+          line-height: 1.8;
+          margin-bottom: 44px;
+        }
+        .h-cta-btns {
+          display: flex;
+          gap: 14px;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        /* ─── SERVICE STRIP ────────────────────────────────── */
+        .h-services {
+          background: #030710;
+          padding: 80px 48px;
+          border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .h-svc-grid {
+          max-width: 1360px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 16px;
+        }
+        .h-svc-card {
           border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 14px;
-          padding: 32px 28px;
+          border-radius: 10px;
+          padding: 36px 32px;
+          background: rgba(255,255,255,0.02);
           transition: all 0.25s ease;
           position: relative;
           overflow: hidden;
         }
-        .hp-feature-card::before {
+        .h-svc-card::before {
           content: '';
           position: absolute;
-          inset: 0;
-          background: linear-gradient(135deg, rgba(29,78,216,0.06) 0%, transparent 60%);
-          opacity: 0;
-          transition: opacity 0.25s;
+          top: 0; left: 0; right: 0; height: 1px;
+          background: linear-gradient(90deg, transparent, transparent, transparent);
+          transition: background 0.3s;
         }
-        .hp-feature-card:hover {
-          border-color: rgba(59,130,246,0.25);
+        .h-svc-card:hover {
+          border-color: rgba(59,130,246,0.2);
+          background: rgba(29,78,216,0.04);
           transform: translateY(-3px);
-          box-shadow: 0 16px 48px rgba(0,0,0,0.3), 0 0 0 1px rgba(59,130,246,0.1);
+          box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
-        .hp-feature-card:hover::before { opacity: 1; }
-
-        .hp-feature-icon {
-          width: 44px;
-          height: 44px;
-          border-radius: 10px;
-          background: rgba(29,78,216,0.15);
-          border: 1px solid rgba(59,130,246,0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 20px;
-          margin-bottom: 20px;
+        .h-svc-card:hover::before {
+          background: linear-gradient(90deg, transparent, rgba(59,130,246,0.5), transparent);
         }
-        .hp-feature-title {
-          font-family: 'Cormorant Garamond', Georgia, serif;
-          font-size: 20px;
+        .h-svc-emoji { font-size: 28px; margin-bottom: 20px; display: block; }
+        .h-svc-title {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: 22px;
           font-weight: 700;
-          color: #ffffff;
-          margin-bottom: 10px;
-          letter-spacing: 0.01em;
+          color: #fff;
+          margin-bottom: 12px;
         }
-        .hp-feature-desc {
-          font-family: 'DM Sans', sans-serif;
+        .h-svc-desc {
+          font-family: 'Outfit', sans-serif;
           font-size: 13.5px;
           font-weight: 300;
-          color: rgba(255,255,255,0.4);
-          line-height: 1.7;
+          color: rgba(255,255,255,0.35);
+          line-height: 1.8;
+          margin-bottom: 22px;
         }
-
-        /* ── Stats band ── */
-        .hp-stats-band {
-          padding: 72px 28px;
-          border-top: 1px solid rgba(255,255,255,0.06);
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-          background: #070c18;
-        }
-        .hp-stat-num {
-          font-family: 'Cormorant Garamond', Georgia, serif;
-          font-size: clamp(40px, 6vw, 64px);
-          font-weight: 700;
-          color: #ffffff;
-          line-height: 1;
-          letter-spacing: -0.02em;
-        }
-        .hp-stat-unit {
-          color: #3b82f6;
-        }
-        .hp-stat-label {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 12px;
+        .h-svc-link {
+          font-family: 'Outfit', sans-serif;
+          font-size: 11px;
           font-weight: 500;
           letter-spacing: 0.12em;
           text-transform: uppercase;
-          color: rgba(255,255,255,0.3);
-          margin-top: 6px;
+          color: #3b82f6;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          transition: gap 0.2s;
         }
+        .h-svc-link:hover { gap: 12px; }
 
-        /* ── Inventory CTA ── */
-        .hp-inventory-cta {
-          padding: 96px 28px;
-          background: #04060c;
-          position: relative;
-          overflow: hidden;
+        /* ─── RESPONSIVE ───────────────────────────────────── */
+        @media (max-width: 1100px) {
+          .h-cards { grid-template-columns: repeat(2, 1fr); }
+          .h-stats-inner { grid-template-columns: repeat(2, 1fr); }
+          .h-stat-cell:nth-child(2) { border-right: none; }
+          .h-stat-cell:nth-child(3) { border-top: 1px solid rgba(255,255,255,0.06); }
+          .h-stat-cell:nth-child(4) { border-top: 1px solid rgba(255,255,255,0.06); border-right: none; }
         }
-        .hp-inventory-cta::before {
-          content: '';
-          position: absolute;
-          width: 600px;
-          height: 600px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(29,78,216,0.12) 0%, transparent 70%);
-          top: 50%; left: 50%;
-          transform: translate(-50%, -50%);
-          pointer-events: none;
-        }
-
-        .hp-cta-box {
-          position: relative;
-          max-width: 780px;
-          margin: 0 auto;
-          text-align: center;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 20px;
-          padding: 64px 48px;
-        }
-        .hp-cta-box::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 50%;
-          transform: translateX(-50%);
-          width: 60%;
-          height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(59,130,246,0.5), transparent);
-        }
-
-        /* ── Finance strip ── */
-        .hp-finance {
-          padding: 64px 28px;
-          background: #070c18;
-          border-top: 1px solid rgba(255,255,255,0.06);
-        }
-
-        /* Responsive */
         @media (max-width: 860px) {
-          .hp-hero-inner {
-            grid-template-columns: 1fr;
-            gap: 40px;
-            padding: 80px 20px 60px;
-            text-align: center;
-          }
-          .hp-glass-card {
-            padding: 32px 24px;
-          }
-          .hp-eyebrow {
-            justify-content: center;
-          }
-          .hp-subline {
-            margin-left: auto;
-            margin-right: auto;
-          }
-          .hp-cta-row {
-            justify-content: center;
-          }
-          .hp-hero-visual {
-            height: 280px;
-            order: -1;
-          }
-          .hp-stat-chip:nth-child(2) { display: none; }
-          .hp-stat-chip:nth-child(3) { display: none; }
-          .hp-cta-box { padding: 40px 24px; }
+          .h-hero-inner { grid-template-columns: 1fr; padding: 0 24px 60px; }
+          .h-hero-panel { display: none; }
+          .h-why, .h-services, .h-cta-full { padding-left: 24px; padding-right: 24px; }
+          .h-svc-grid { grid-template-columns: 1fr; }
+          .h-scroll { display: none; }
+          .h-stat-cell { padding: 40px 28px; }
+        }
+        @media (max-width: 600px) {
+          .h-cards { grid-template-columns: 1fr; }
+          .h-stats-inner { grid-template-columns: 1fr 1fr; }
         }
       `}</style>
 
-      {/* ══════════════════════════════════════════════ */}
-      {/* HERO                                          */}
-      {/* ══════════════════════════════════════════════ */}
-      <section className="hp-hero">
-        <div className="hp-orb hp-orb-1" />
-        <div className="hp-orb hp-orb-2" />
-        <div className="hp-orb hp-orb-3" />
+      {/* ════════════════════════════════════════════════════════ */}
+      {/* HERO — Full-bleed Porsche photograph                    */}
+      {/* ════════════════════════════════════════════════════════ */}
+      <section className="h-hero">
+        <div className="h-hero-bg" />
+        <div className="h-hero-overlay" />
+        <div className="h-hero-vignette" />
+        <div className="h-hero-lines" />
 
-        <div className="hp-hero-inner">
-          {/* Left — glass card with text */}
-          <div className="hp-glass-card">
-            <p className="hp-eyebrow">Sri Lanka&apos;s Premier Dealership</p>
-            <h1 className="hp-headline">
-              Drive Your<br />
-              <em>Dream</em> With<br />
-              Confidence
-            </h1>
-            <p className="hp-subline">
-              Handpicked vehicles. Transparent pricing. Zero compromise.
-              Discover our curated collection of premium cars — from city commuters to luxury SUVs.
+        <div className="h-hero-inner">
+          {/* Left — headline */}
+          <div>
+            <p className="h-tag">
+              <span className="h-tag-line" />
+              Sri Lanka&apos;s Premier Dealership
             </p>
-            <div className="hp-cta-row">
-              <Link href="/inventory" className="hp-btn-primary">
-                Browse Inventory <span>→</span>
+            <h1 className="h-headline">
+              Drive<br />
+              <span className="h-headline-outline">Exceptional</span><br />
+              Every Day
+            </h1>
+            <p className="h-sub">
+              Handpicked vehicles. Ruthlessly transparent pricing.
+              From city commuters to exotic luxury — your next car is here.
+            </p>
+            <div className="h-cta-row">
+              <Link href="/inventory" className="h-btn-solid">
+                Browse Stock
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </Link>
-              <Link href="/contact" className="hp-btn-ghost">
-                Get in Touch
-              </Link>
+              <a
+                href={`https://wa.me/${DEALERSHIP.whatsapp.replace(/\D/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-btn-outline"
+              >
+                💬 WhatsApp Us
+              </a>
             </div>
           </div>
 
-          {/* Right — animated car illustration */}
-          <div className="hp-hero-visual">
-            <div className="hp-car-glow" />
-
-            {/* Floating stat chips */}
-            <div className="hp-stat-chip" style={{ top: '8%', right: '4%' }}>
-              <div className="hp-stat-chip-num">500+</div>
-              <div className="hp-stat-chip-label">Cars Sold</div>
-            </div>
-            <div className="hp-stat-chip" style={{ bottom: '12%', left: '2%', animationDelay: '-1.5s' }}>
-              <div className="hp-stat-chip-num">10+</div>
-              <div className="hp-stat-chip-label">Years</div>
-            </div>
-
-            {/* Luxury car SVG illustration */}
-            <svg className="hp-car-svg" viewBox="0 0 500 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Ground shadow */}
-              <ellipse cx="250" cy="200" rx="200" ry="10" fill="rgba(29,78,216,0.2)" />
-
-              {/* Body */}
-              <path d="M60 160 L60 130 Q80 80 140 70 L200 60 Q240 50 280 55 L360 65 Q400 72 430 95 L450 130 L450 160 Z"
-                fill="#0a1628" stroke="rgba(59,130,246,0.4)" strokeWidth="1.5"/>
-
-              {/* Roof / cabin glass */}
-              <path d="M155 125 L175 80 Q200 65 240 62 L295 62 Q330 65 355 82 L375 125 Z"
-                fill="rgba(59,130,246,0.15)" stroke="rgba(96,165,250,0.3)" strokeWidth="1"/>
-
-              {/* Windshield highlight */}
-              <path d="M170 120 L188 82 Q205 68 235 65 L270 65"
-                stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" strokeLinecap="round"/>
-
-              {/* Hood highlight line */}
-              <path d="M375 125 Q400 118 430 130"
-                stroke="rgba(59,130,246,0.5)" strokeWidth="1.5" strokeLinecap="round"/>
-
-              {/* Side body highlight */}
-              <path d="M65 148 Q200 140 440 145"
-                stroke="rgba(59,130,246,0.3)" strokeWidth="1" strokeLinecap="round"/>
-
-              {/* Front grille */}
-              <rect x="432" y="128" width="18" height="22" rx="2"
-                fill="rgba(59,130,246,0.2)" stroke="rgba(96,165,250,0.4)" strokeWidth="1"/>
-              <line x1="432" y1="135" x2="450" y2="135" stroke="rgba(96,165,250,0.4)" strokeWidth="0.8"/>
-              <line x1="432" y1="141" x2="450" y2="141" stroke="rgba(96,165,250,0.4)" strokeWidth="0.8"/>
-              <line x1="432" y1="147" x2="450" y2="147" stroke="rgba(96,165,250,0.4)" strokeWidth="0.8"/>
-
-              {/* Headlight */}
-              <path d="M438 118 Q446 115 452 120 L452 128 Q446 130 438 128 Z"
-                fill="rgba(147,197,253,0.6)" stroke="rgba(96,165,250,0.5)" strokeWidth="0.8"/>
-              {/* Headlight glow */}
-              <ellipse cx="455" cy="123" rx="6" ry="4"
-                fill="rgba(147,197,253,0.3)" filter="url(#blur)"/>
-
-              {/* Tail light */}
-              <rect x="58" y="118" width="10" height="22" rx="2"
-                fill="rgba(239,68,68,0.4)" stroke="rgba(239,68,68,0.3)" strokeWidth="0.8"/>
-
-              {/* Front wheel */}
-              <circle cx="370" cy="168" r="30" fill="#070c18" stroke="rgba(59,130,246,0.4)" strokeWidth="2"/>
-              <circle cx="370" cy="168" r="20" fill="#0a1628" stroke="rgba(59,130,246,0.25)" strokeWidth="1.5"/>
-              <circle cx="370" cy="168" r="10" fill="#060911" stroke="rgba(96,165,250,0.3)" strokeWidth="1"/>
-              {/* Spokes */}
-              {[0,60,120,180,240,300].map((angle, i) => (
-                <line key={i}
-                  x1={370 + 11 * Math.cos(angle * Math.PI/180)}
-                  y1={168 + 11 * Math.sin(angle * Math.PI/180)}
-                  x2={370 + 19 * Math.cos(angle * Math.PI/180)}
-                  y2={168 + 19 * Math.sin(angle * Math.PI/180)}
-                  stroke="rgba(96,165,250,0.5)" strokeWidth="1.5"/>
+          {/* Right — glass stats panel */}
+          <div className="h-hero-panel">
+            <p className="h-panel-title">At a Glance</p>
+            <div className="h-panel-stats">
+              {[
+                { num: '500', a: '+', label: 'Vehicles Sold'    },
+                { num: '10',  a: '+', label: 'Years Active'     },
+                { num: '98',  a: '%', label: 'Satisfied Buyers' },
+                { num: '5',   a: '+', label: 'Finance Partners' },
+              ].map(s => (
+                <div key={s.label} className="h-panel-stat">
+                  <div className="h-panel-stat-num">{s.num}<span className="h-panel-stat-accent">{s.a}</span></div>
+                  <div className="h-panel-stat-label">{s.label}</div>
+                </div>
               ))}
-
-              {/* Rear wheel */}
-              <circle cx="140" cy="168" r="30" fill="#070c18" stroke="rgba(59,130,246,0.4)" strokeWidth="2"/>
-              <circle cx="140" cy="168" r="20" fill="#0a1628" stroke="rgba(59,130,246,0.25)" strokeWidth="1.5"/>
-              <circle cx="140" cy="168" r="10" fill="#060911" stroke="rgba(96,165,250,0.3)" strokeWidth="1"/>
-              {[0,60,120,180,240,300].map((angle, i) => (
-                <line key={i}
-                  x1={140 + 11 * Math.cos(angle * Math.PI/180)}
-                  y1={168 + 11 * Math.sin(angle * Math.PI/180)}
-                  x2={140 + 19 * Math.cos(angle * Math.PI/180)}
-                  y2={168 + 19 * Math.sin(angle * Math.PI/180)}
-                  stroke="rgba(96,165,250,0.5)" strokeWidth="1.5"/>
+            </div>
+            <div className="h-panel-badges">
+              {['Inspected', 'Finance Ready', 'Trade-In', 'Test Drive', 'Island Delivery'].map(b => (
+                <span key={b} className="h-badge">{b}</span>
               ))}
-
-              {/* Door lines */}
-              <line x1="260" y1="68" x2="258" y2="158" stroke="rgba(59,130,246,0.2)" strokeWidth="1"/>
-              <line x1="340" y1="72" x2="338" y2="155" stroke="rgba(59,130,246,0.15)" strokeWidth="0.8"/>
-
-              {/* Door handle */}
-              <rect x="295" y="118" width="18" height="4" rx="2"
-                fill="rgba(96,165,250,0.4)"/>
-
-              <defs>
-                <filter id="blur"><feGaussianBlur stdDeviation="3"/></filter>
-              </defs>
-            </svg>
+            </div>
           </div>
+        </div>
+
+        <div className="h-scroll">
+          <span className="h-scroll-text">Scroll</span>
+          <span className="h-scroll-line" />
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════ */}
-      {/* MARQUEE STRIP                                  */}
-      {/* ══════════════════════════════════════════════ */}
-      <div className="hp-marquee-strip">
-        <div className="hp-marquee-track">
-          {Array.from({ length: 2 }).map((_, trackIdx) => (
+      {/* ════════════════════════════════════════════════════════ */}
+      {/* MARQUEE                                                  */}
+      {/* ════════════════════════════════════════════════════════ */}
+      <div className="h-marquee" aria-hidden="true">
+        <div className="h-marquee-track">
+          {Array.from({ length: 2 }).map((_, t) =>
             ['Premium Selection', 'Transparent Pricing', 'Finance Available', 'Trade-In Welcome',
              'Fully Inspected', 'Test Drive Anytime', 'Trusted Since 2014', 'Island-Wide Delivery'].map((item, i) => (
-              <span key={`${trackIdx}-${i}`} className="hp-marquee-item">
-                {item}
-                <span className="hp-marquee-dot" />
+              <span key={`${t}-${i}`} className="h-marquee-item">
+                {item}<span className="h-marquee-diamond" />
               </span>
             ))
-          ))}
+          )}
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════ */}
-      {/* WHY CHOOSE US                                  */}
-      {/* ══════════════════════════════════════════════ */}
-      <section className="hp-why">
-        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-          <div style={{ marginBottom: 56 }}>
-            <p className="hp-section-label">Why Choose Us</p>
-            <h2 className="hp-section-title">
-              The Standard You<br />Deserve
-            </h2>
-            <p className="hp-section-sub">
-              We built {DEALERSHIP.name} around one idea: buying a car should feel
-              as good as driving one.
-            </p>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+      {/* ════════════════════════════════════════════════════════ */}
+      {/* WHY CHOOSE US                                            */}
+      {/* ════════════════════════════════════════════════════════ */}
+      <section className="h-why">
+        <div style={{ maxWidth: 1360, margin: '0 auto' }}>
+          <p className="h-section-kicker">Why {DEALERSHIP.name}</p>
+          <h2 className="h-section-h2">The Standard<br />You <em>Deserve</em></h2>
+          <div className="h-cards">
             {[
-              {
-                icon: '🛡️',
-                title: 'Fully Inspected',
-                desc: 'Every vehicle undergoes a rigorous multi-point inspection before it reaches our lot. No hidden surprises.',
-              },
-              {
-                icon: '💎',
-                title: 'Transparent Pricing',
-                desc: 'The price you see is the price we discuss. No inflated stickers, no pressure tactics, ever.',
-              },
-              {
-                icon: '🏦',
-                title: 'Finance Made Easy',
-                desc: 'Partner banks and leasing companies on standby. We handle the paperwork so you can focus on the drive.',
-              },
-              {
-                icon: '🔄',
-                title: 'Trade-In Welcome',
-                desc: 'Bring your current vehicle. We offer fair market valuations with no obligation to buy.',
-              },
+              { num: '01', icon: '🛡️', title: 'Fully Inspected',    desc: 'Every vehicle passes a rigorous multi-point inspection. What you see is exactly what you get — no surprises after the handshake.' },
+              { num: '02', icon: '💎', title: 'Honest Pricing',     desc: 'The number on the windscreen is the number we talk from. No hidden dealer fees, no inflated stickers. Ever.' },
+              { num: '03', icon: '🏦', title: 'Finance Ready',      desc: '5+ partner banks and leasing companies. We handle the paperwork — you focus on enjoying your new car.' },
+              { num: '04', icon: '🔑', title: 'Test Drive Anytime', desc: 'Every vehicle on our lot is available for a proper test drive. Just walk in — no appointment, no pressure.' },
             ].map(f => (
-              <div key={f.title} className="hp-feature-card">
-                <div className="hp-feature-icon">{f.icon}</div>
-                <h3 className="hp-feature-title">{f.title}</h3>
-                <p className="hp-feature-desc">{f.desc}</p>
+              <div key={f.title} className="h-card">
+                <div className="h-card-num">{f.num}</div>
+                <span className="h-card-icon">{f.icon}</span>
+                <h3 className="h-card-title">{f.title}</h3>
+                <p className="h-card-desc">{f.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════ */}
-      {/* STATS BAND                                     */}
-      {/* ══════════════════════════════════════════════ */}
-      <section className="hp-stats-band">
-        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 40, textAlign: 'center' }}>
-            {[
-              { num: '500', unit: '+', label: 'Vehicles Sold'    },
-              { num: '10',  unit: '+', label: 'Years in Business' },
-              { num: '98',  unit: '%', label: 'Customer Satisfaction' },
-              { num: '5',   unit: '+', label: 'Finance Partners'  },
-            ].map(s => (
-              <div key={s.label}>
-                <div className="hp-stat-num">
-                  {s.num}<span className="hp-stat-unit">{s.unit}</span>
-                </div>
-                <div className="hp-stat-label">{s.label}</div>
-              </div>
-            ))}
-          </div>
+      {/* ════════════════════════════════════════════════════════ */}
+      {/* STATS                                                    */}
+      {/* ════════════════════════════════════════════════════════ */}
+      <section className="h-stats">
+        <div className="h-stats-inner">
+          {[
+            { big: '500', a: '+', label: 'Vehicles Sold'         },
+            { big: '10',  a: '+', label: 'Years in Business'     },
+            { big: '98',  a: '%', label: 'Customer Satisfaction' },
+            { big: '5',   a: '+', label: 'Finance Partners'      },
+          ].map(s => (
+            <div key={s.label} className="h-stat-cell">
+              <div className="h-stat-big">{s.big}<span className="h-stat-blue">{s.a}</span></div>
+              <div className="h-stat-lbl">{s.label}</div>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════ */}
-      {/* INVENTORY CTA                                  */}
-      {/* ══════════════════════════════════════════════ */}
-      <section className="hp-inventory-cta">
-        <div className="hp-cta-box">
-          <p className="hp-section-label" style={{ justifyContent: 'center' }}>Browse Our Stock</p>
-          <h2 className="hp-section-title" style={{ marginBottom: 16 }}>
-            Find Your Perfect<br />
-            <em style={{ color: '#60a5fa', fontStyle: 'italic' }}>Match Today</em>
-          </h2>
-          <p style={{
-            fontFamily:  "'DM Sans', sans-serif",
-            fontSize:    15,
-            fontWeight:  300,
-            color:       'rgba(255,255,255,0.4)',
-            lineHeight:  1.7,
-            marginBottom: 36,
-          }}>
+      {/* ════════════════════════════════════════════════════════ */}
+      {/* INVENTORY CTA                                            */}
+      {/* ════════════════════════════════════════════════════════ */}
+      <section className="h-cta-full">
+        <div className="h-cta-inner">
+          <p className="h-section-kicker" style={{ justifyContent: 'center' }}>Browse Our Stock</p>
+          <h2 className="h-cta-h2">Find Your<br /><em>Perfect Match</em></h2>
+          <p className="h-cta-sub">
             From compact city cars to executive saloons — browse our full inventory
             with real-time availability, full specs, and honest pricing.
           </p>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/inventory" className="hp-btn-primary">
-              View All Vehicles <span>→</span>
+          <div className="h-cta-btns">
+            <Link href="/inventory" className="h-btn-solid">
+              View All Vehicles
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </Link>
-            <a
-              href={`https://wa.me/${DEALERSHIP.whatsapp.replace(/\D/g, '')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hp-btn-ghost"
-            >
-              💬 Ask on WhatsApp
-            </a>
+            <Link href="/contact" className="h-btn-outline">Get in Touch</Link>
           </div>
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════ */}
-      {/* FINANCE / CONTACT STRIP                        */}
-      {/* ══════════════════════════════════════════════ */}
-      <section className="hp-finance">
-        <div style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
-          {/* Finance */}
-          <div style={{
-            background:   'rgba(29,78,216,0.08)',
-            border:       '1px solid rgba(29,78,216,0.2)',
-            borderRadius: 14,
-            padding:      '32px 28px',
-          }}>
-            <div style={{ fontSize: 28, marginBottom: 16 }}>🏦</div>
-            <h3 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 700, color: '#ffffff', marginBottom: 10 }}>
-              Finance Options
-            </h3>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13.5, fontWeight: 300, color: 'rgba(255,255,255,0.45)', lineHeight: 1.7, marginBottom: 18 }}>
-              Low down payments. Competitive rates. We work with 5+ banks and leasing companies to find the deal that works for you.
+      {/* ════════════════════════════════════════════════════════ */}
+      {/* SERVICES                                                 */}
+      {/* ════════════════════════════════════════════════════════ */}
+      <section className="h-services">
+        <div className="h-svc-grid">
+          <div className="h-svc-card">
+            <span className="h-svc-emoji">🏦</span>
+            <h3 className="h-svc-title">Finance Options</h3>
+            <p className="h-svc-desc">
+              Low down payments. Competitive rates. We work with 5+ banks and leasing
+              companies to get you a deal that actually makes sense.
             </p>
-            <Link href="/contact?subject=Finance Enquiry" className="hp-btn-ghost" style={{ fontSize: 12, padding: '10px 18px' }}>
-              Enquire Now →
-            </Link>
+            <Link href="/contact?subject=Finance+Enquiry" className="h-svc-link">Enquire Now →</Link>
           </div>
-
-          {/* Visit */}
-          <div style={{
-            background:   'rgba(255,255,255,0.025)',
-            border:       '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 14,
-            padding:      '32px 28px',
-          }}>
-            <div style={{ fontSize: 28, marginBottom: 16 }}>📍</div>
-            <h3 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 700, color: '#ffffff', marginBottom: 10 }}>
-              Visit Us
-            </h3>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13.5, fontWeight: 300, color: 'rgba(255,255,255,0.45)', lineHeight: 1.7, marginBottom: 18 }}>
-              {DEALERSHIP.address}<br />
-              <span style={{ color: 'rgba(255,255,255,0.3)' }}>{DEALERSHIP.workingHours}</span>
+          <div className="h-svc-card">
+            <span className="h-svc-emoji">🔄</span>
+            <h3 className="h-svc-title">Trade-In Your Car</h3>
+            <p className="h-svc-desc">
+              Get a fair, no-obligation valuation on your current vehicle and use it
+              toward your next one. Quick assessment, honest numbers.
             </p>
-            <a
-              href={`tel:${DEALERSHIP.phone}`}
-              className="hp-btn-ghost"
-              style={{ fontSize: 12, padding: '10px 18px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            >
-              📞 {DEALERSHIP.phone}
-            </a>
+            <Link href="/contact?subject=Trade-In+Valuation" className="h-svc-link">Get a Quote →</Link>
           </div>
-
-          {/* Trade-in */}
-          <div style={{
-            background:   'rgba(255,255,255,0.025)',
-            border:       '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 14,
-            padding:      '32px 28px',
-          }}>
-            <div style={{ fontSize: 28, marginBottom: 16 }}>🔄</div>
-            <h3 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 700, color: '#ffffff', marginBottom: 10 }}>
-              Trade-In Your Car
-            </h3>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13.5, fontWeight: 300, color: 'rgba(255,255,255,0.45)', lineHeight: 1.7, marginBottom: 18 }}>
-              Get a fair valuation for your current vehicle and use it toward the purchase of your next one. Quick. Hassle-free.
+          <div className="h-svc-card">
+            <span className="h-svc-emoji">📍</span>
+            <h3 className="h-svc-title">Visit Our Showroom</h3>
+            <p className="h-svc-desc">
+              {DEALERSHIP.address}.{' '}
+              <span style={{ color: 'rgba(255,255,255,0.2)' }}>{DEALERSHIP.workingHours}.</span>
+              {' '}No appointment needed.
             </p>
-            <Link href="/contact?subject=Trade-In Valuation" className="hp-btn-ghost" style={{ fontSize: 12, padding: '10px 18px' }}>
-              Get a Quote →
-            </Link>
+            <a href={`tel:${DEALERSHIP.phone}`} className="h-svc-link">{DEALERSHIP.phone} →</a>
           </div>
         </div>
       </section>
