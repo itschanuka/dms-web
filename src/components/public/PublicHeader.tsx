@@ -14,120 +14,78 @@ const NAV_LINKS = [
 
 export default function PublicHeader() {
   const pathname = usePathname();
-  const [open,      setOpen]      = useState(false);
-  const [scrolled,  setScrolled]  = useState(false);
-  const [theme,     setTheme]     = useState<'dark' | 'light'>('dark');
+  const [open,     setOpen]     = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
-  // Close mobile menu on route change
   useEffect(() => { setOpen(false); }, [pathname]);
 
-  // Detect scroll for header elevation
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Apply theme to document
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  // Prevent body scroll when mobile menu open
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
-  const isDark = theme === 'dark';
-
-  const colors = {
-    bg:          isDark ? 'rgba(4, 6, 12, 0.92)'  : 'rgba(255, 255, 255, 0.92)',
-    bgScrolled:  isDark ? 'rgba(4, 6, 12, 0.98)'  : 'rgba(255, 255, 255, 0.98)',
-    border:      isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)',
-    text:        isDark ? '#e8eef8'                : '#0f1923',
-    textMuted:   isDark ? '#4a6080'                : '#8098b0',
-    navHover:    isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-    activeText:  isDark ? '#ffffff'                : '#0f1923',
-    activeBg:    isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-    mobileBg:    isDark ? '#04060c'                : '#ffffff',
-    mobileDivider: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)',
-    btnBorder:   isDark ? 'rgba(255,255,255,0.1)'  : 'rgba(0,0,0,0.12)',
-    btnText:     isDark ? '#8097b8'                : '#607090',
-  };
-
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Outfit:wght@300;400;500;600&display=swap');
 
-        .ph-logo-text {
-          font-family: 'Cormorant Garamond', Georgia, serif;
-          font-size: 20px;
+        .ph-logo {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: 19px;
           font-weight: 700;
-          letter-spacing: 0.04em;
-          color: ${colors.text};
+          letter-spacing: 0.02em;
+          color: #0f1923;
           text-decoration: none;
+          display: flex;
+          align-items: center;
+          gap: 10px;
           transition: opacity 0.2s;
         }
-        .ph-logo-text:hover { opacity: 0.8; }
+        .ph-logo:hover { opacity: 0.7; }
 
         .ph-nav-link {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 13px;
+          font-family: 'Outfit', sans-serif;
+          font-size: 12px;
           font-weight: 500;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
           text-decoration: none;
           padding: 7px 14px;
-          border-radius: 6px;
+          border-radius: 5px;
+          color: #6b7f96;
           transition: all 0.18s ease;
-          position: relative;
         }
-        .ph-nav-link:hover {
-          background: ${colors.navHover};
-        }
+        .ph-nav-link:hover { color: #0f1923; background: rgba(0,0,0,0.05); }
+        .ph-nav-link.active { color: #0f1923; font-weight: 600; background: rgba(0,0,0,0.06); }
 
-        .ph-theme-btn {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          border: 1px solid ${colors.btnBorder};
-          background: transparent;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 15px;
-          transition: all 0.2s;
-          color: ${colors.btnText};
-          flex-shrink: 0;
-        }
-        .ph-theme-btn:hover {
-          border-color: ${isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)'};
-          background: ${colors.navHover};
-          transform: rotate(20deg);
-        }
-
-        .ph-cta {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 12px;
+        .ph-enquire {
+          font-family: 'Outfit', sans-serif;
+          font-size: 11px;
           font-weight: 600;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
           text-decoration: none;
-          padding: 8px 18px;
-          border-radius: 6px;
-          background: transparent;
-          border: 1px solid ${isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)'};
-          color: ${colors.text};
+          padding: 9px 20px;
+          border-radius: 5px;
+          background: #0f1923;
+          color: #fff;
+          border: 1px solid #0f1923;
           transition: all 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
           white-space: nowrap;
         }
-        .ph-cta:hover {
-          background: ${colors.text};
-          color: ${isDark ? '#04060c' : '#ffffff'};
-          border-color: ${colors.text};
+        .ph-enquire:hover {
+          background: #1d4ed8;
+          border-color: #1d4ed8;
+          box-shadow: 0 4px 20px rgba(29,78,216,0.25);
         }
 
         .ph-hamburger {
@@ -135,18 +93,18 @@ export default function PublicHeader() {
           flex-direction: column;
           gap: 5px;
           background: none;
-          border: 1px solid ${colors.btnBorder};
+          border: 1px solid rgba(0,0,0,0.12);
           border-radius: 6px;
           padding: 9px 10px;
           cursor: pointer;
           transition: border-color 0.2s;
         }
-        .ph-hamburger:hover { border-color: ${colors.btnText}; }
+        .ph-hamburger:hover { border-color: rgba(0,0,0,0.28); }
         .ph-hamburger span {
           display: block;
           width: 18px;
           height: 1.5px;
-          background: ${colors.textMuted};
+          background: #6b7f96;
           border-radius: 2px;
           transition: all 0.25s ease;
           transform-origin: center;
@@ -155,83 +113,71 @@ export default function PublicHeader() {
         .ph-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
         .ph-hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
 
-        .ph-mobile-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,0.5);
+        .ph-overlay {
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,0.3);
           backdrop-filter: blur(4px);
           z-index: 998;
-          animation: ph-fade-in 0.2s ease;
+          animation: ph-fade 0.2s ease;
         }
-        .ph-mobile-drawer {
+        .ph-drawer {
           position: fixed;
-          top: 0;
-          right: 0;
-          bottom: 0;
-          width: min(320px, 85vw);
-          background: ${colors.mobileBg};
-          border-left: 1px solid ${colors.border};
+          top: 0; right: 0; bottom: 0;
+          width: min(300px, 85vw);
+          background: #f8f9fb;
+          border-left: 1px solid rgba(0,0,0,0.08);
           z-index: 999;
           display: flex;
           flex-direction: column;
-          animation: ph-slide-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+          animation: ph-slide 0.28s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .ph-mobile-link {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 15px;
+        .ph-drawer-link {
+          font-family: 'Outfit', sans-serif;
+          font-size: 14px;
           font-weight: 500;
           letter-spacing: 0.04em;
           text-decoration: none;
-          color: ${colors.textMuted};
-          padding: 16px 32px;
+          color: #6b7f96;
+          padding: 16px 28px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          border-bottom: 1px solid ${colors.mobileDivider};
-          transition: color 0.18s, background 0.18s;
+          border-bottom: 1px solid rgba(0,0,0,0.06);
+          transition: color 0.15s, background 0.15s;
         }
-        .ph-mobile-link:hover, .ph-mobile-link.active {
-          color: ${colors.text};
-          background: ${colors.navHover};
+        .ph-drawer-link:hover, .ph-drawer-link.active {
+          color: #0f1923;
+          background: rgba(0,0,0,0.03);
         }
 
-        @keyframes ph-fade-in {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-        @keyframes ph-slide-in {
-          from { transform: translateX(100%); opacity: 0; }
-          to   { transform: translateX(0);    opacity: 1; }
-        }
+        @keyframes ph-fade  { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes ph-slide { from { transform: translateX(100%) } to { transform: translateX(0) } }
 
         @media (max-width: 860px) {
           .ph-desktop-nav { display: none !important; }
           .ph-hamburger   { display: flex !important; }
         }
         @media (min-width: 861px) {
-          .ph-mobile-overlay { display: none !important; }
-          .ph-mobile-drawer  { display: none !important; }
+          .ph-overlay, .ph-drawer { display: none !important; }
         }
       `}</style>
 
       <header style={{
-        position:       'sticky',
-        top:            0,
-        zIndex:         100,
-        background:     scrolled ? colors.bgScrolled : colors.bg,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderBottom:   `1px solid ${scrolled ? colors.border : 'transparent'}`,
-        transition:     'background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
-        boxShadow:      scrolled
-          ? (isDark ? '0 4px 32px rgba(0,0,0,0.4)' : '0 4px 32px rgba(0,0,0,0.08)')
-          : 'none',
+        position:            'sticky',
+        top:                 0,
+        zIndex:              100,
+        background:          scrolled ? 'rgba(248,249,251,0.98)' : 'rgba(248,249,251,0.94)',
+        backdropFilter:      'blur(20px)',
+        WebkitBackdropFilter:'blur(20px)',
+        borderBottom:        scrolled ? '1px solid rgba(0,0,0,0.09)' : '1px solid rgba(0,0,0,0.05)',
+        transition:          'all 0.3s ease',
+        boxShadow:           scrolled ? '0 2px 24px rgba(0,0,0,0.06)' : 'none',
       }}>
         <div style={{
-          maxWidth:       1280,
+          maxWidth:       1360,
           margin:         '0 auto',
-          padding:        '0 28px',
-          height:         68,
+          padding:        '0 32px',
+          height:         66,
           display:        'flex',
           alignItems:     'center',
           justifyContent: 'space-between',
@@ -239,11 +185,11 @@ export default function PublicHeader() {
         }}>
 
           {/* Logo */}
-          <Link href="/" className="ph-logo-text" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-              <rect width="28" height="28" rx="6" fill={isDark ? '#0a1628' : '#f0f4ff'}/>
-              <path d="M6 18L10 10L14 15L17 11L22 18H6Z" fill={isDark ? '#3b82f6' : '#1d4ed8'} opacity="0.9"/>
-              <circle cx="19" cy="10" r="2.5" fill={isDark ? '#60a5fa' : '#3b82f6'} opacity="0.7"/>
+          <Link href="/" className="ph-logo">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+              <rect width="26" height="26" rx="5" fill="#0f1923"/>
+              <path d="M5 18L9 10L13 15L16 11L21 18H5Z" fill="#3b82f6" opacity="0.9"/>
+              <circle cx="18" cy="9" r="2.5" fill="#60a5fa" opacity="0.8"/>
             </svg>
             {DEALERSHIP.name}
           </Link>
@@ -253,16 +199,7 @@ export default function PublicHeader() {
             {NAV_LINKS.map(link => {
               const isActive = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
               return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="ph-nav-link"
-                  style={{
-                    color:      isActive ? colors.activeText : colors.textMuted,
-                    background: isActive ? colors.activeBg : 'transparent',
-                    fontWeight: isActive ? 600 : 500,
-                  }}
-                >
+                <Link key={link.href} href={link.href} className={`ph-nav-link${isActive ? ' active' : ''}`}>
                   {link.label}
                 </Link>
               );
@@ -271,28 +208,14 @@ export default function PublicHeader() {
 
           {/* Right controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Theme toggle */}
-            <button
-              className="ph-theme-btn"
-              onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-              aria-label="Toggle theme"
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {isDark ? '☀️' : '🌙'}
-            </button>
-
-            {/* WhatsApp CTA — desktop only */}
             <a
               href={`https://wa.me/${DEALERSHIP.whatsapp.replace(/\D/g, '')}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="ph-cta ph-desktop-nav"
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              className="ph-enquire ph-desktop-nav"
             >
-              <span style={{ fontSize: 13 }}>↗</span> Enquire
+              <span>↗</span> Enquire
             </a>
-
-            {/* Hamburger */}
             <button
               className={`ph-hamburger${open ? ' open' : ''}`}
               onClick={() => setOpen(o => !o)}
@@ -308,116 +231,66 @@ export default function PublicHeader() {
       {/* Mobile drawer */}
       {open && (
         <>
-          <div className="ph-mobile-overlay" onClick={() => setOpen(false)} />
-          <div className="ph-mobile-drawer">
-            {/* Drawer header */}
+          <div className="ph-overlay" onClick={() => setOpen(false)} />
+          <div className="ph-drawer">
             <div style={{
-              padding:        '20px 24px 18px 32px',
+              padding:        '18px 20px 16px 28px',
               display:        'flex',
               alignItems:     'center',
               justifyContent: 'space-between',
-              borderBottom:   `1px solid ${colors.mobileDivider}`,
+              borderBottom:   '1px solid rgba(0,0,0,0.07)',
             }}>
-              <span style={{
-                fontFamily:    "'Cormorant Garamond', Georgia, serif",
-                fontSize:      17,
-                fontWeight:    700,
-                color:         colors.text,
-                letterSpacing: '0.04em',
-              }}>
+              <span style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 16, fontWeight: 700, color: '#0f1923' }}>
                 {DEALERSHIP.name}
               </span>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close menu"
                 style={{
-                  width:        36,
-                  height:       36,
-                  borderRadius: '50%',
-                  border:       `1px solid ${colors.btnBorder}`,
-                  background:   'transparent',
-                  cursor:       'pointer',
-                  display:      'flex',
-                  alignItems:   'center',
-                  justifyContent: 'center',
-                  fontSize:     18,
-                  color:        colors.textMuted,
-                  lineHeight:   1,
-                  transition:   'all 0.18s',
+                  width: 34, height: 34, borderRadius: '50%',
+                  border: '1px solid rgba(0,0,0,0.1)',
+                  background: 'transparent', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 16, color: '#6b7f96',
                 }}
               >
                 ✕
               </button>
             </div>
 
-            {/* Nav links */}
-            <nav style={{ flex: 1, overflowY: 'auto', paddingTop: 8 }}>
+            <nav style={{ flex: 1, overflowY: 'auto', paddingTop: 6 }}>
               {NAV_LINKS.map(link => {
                 const isActive = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`ph-mobile-link${isActive ? ' active' : ''}`}
+                    className={`ph-drawer-link${isActive ? ' active' : ''}`}
                     onClick={() => setOpen(false)}
                   >
                     {link.label}
-                    <span style={{ fontSize: 12, opacity: 0.4 }}>→</span>
+                    <span style={{ fontSize: 11, opacity: 0.3 }}>→</span>
                   </Link>
                 );
               })}
             </nav>
 
-            {/* Bottom section */}
-            <div style={{ padding: '20px 32px 32px', borderTop: `1px solid ${colors.mobileDivider}` }}>
+            <div style={{ padding: '18px 28px 28px', borderTop: '1px solid rgba(0,0,0,0.07)' }}>
               <a
                 href={`https://wa.me/${DEALERSHIP.whatsapp.replace(/\D/g, '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setOpen(false)}
                 style={{
-                  display:        'flex',
-                  alignItems:     'center',
-                  justifyContent: 'center',
-                  gap:            8,
-                  width:          '100%',
-                  padding:        '13px 20px',
-                  borderRadius:   8,
-                  background:     '#25D366',
-                  color:          '#fff',
-                  fontFamily:     "'DM Sans', sans-serif",
-                  fontSize:       14,
-                  fontWeight:     600,
-                  textDecoration: 'none',
-                  letterSpacing:  '0.02em',
-                  marginBottom:   12,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, width: '100%', padding: '13px 20px', borderRadius: 7,
+                  background: '#25D366', color: '#fff',
+                  fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600,
+                  textDecoration: 'none', letterSpacing: '0.04em',
                 }}
               >
                 💬 WhatsApp Us
               </a>
-
-              {/* Theme toggle in mobile */}
-              <button
-                onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-                style={{
-                  display:        'flex',
-                  alignItems:     'center',
-                  justifyContent: 'center',
-                  gap:            8,
-                  width:          '100%',
-                  padding:        '11px 20px',
-                  borderRadius:   8,
-                  border:         `1px solid ${colors.btnBorder}`,
-                  background:     'transparent',
-                  cursor:         'pointer',
-                  fontFamily:     "'DM Sans', sans-serif",
-                  fontSize:       13,
-                  fontWeight:     500,
-                  color:          colors.textMuted,
-                }}
-              >
-                {isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
-              </button>
             </div>
           </div>
         </>
