@@ -294,7 +294,7 @@ export default function VehicleDetailPage({ params }: Props) {
 
             <div style={{ background: '#0d1117', border: '1px solid #1f2d45', borderRadius: 12, padding: 24 }}>
               {activeTab === 'details' && <DetailsTab vehicle={vehicle} />}
-              {activeTab === 'costs'   && <CostTable vehicleId={vehicle.id} canEdit={canEdit} />}
+              {activeTab === 'costs'   && <CostTable vehicleId={vehicle.id} stockId={vehicle.stock_id} canEdit={canEdit} />}
               {activeTab === 'media'   && <PhotoGallery vehicleId={vehicle.id} stockId={vehicle.stock_id} canEdit={canEdit} />}
             </div>
           </div>
