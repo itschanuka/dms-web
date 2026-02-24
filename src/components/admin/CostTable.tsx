@@ -323,7 +323,7 @@ export default function CostTable({ vehicleId, stockId, canEdit }: Props) {
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/*,.pdf"
+                  accept="*/*"
                   style={{ display: 'none' }}
                   onChange={e => {
                     const file = e.target.files?.[0];
