@@ -5,20 +5,21 @@ import { adminApi } from '@/lib/api';
 import { formatPrice } from '@/lib/formatters';
 import { createClient } from '@/lib/supabase/client';
 
+interface ReceiptFile { url: string; name: string; }
+
 interface Cost {
-  id:           string;
-  category:     string;
-  description:  string;
-  amount:       number;
-  cost_date:    string;
-  receipt_url:  string | null;
-  receipt_name: string | null;
-  created_at:   string;
+  id:            string;
+  category:      string;
+  description:   string;
+  amount:        number;
+  cost_date:     string;
+  receipt_files: ReceiptFile[] | null;
+  created_at:    string;
 }
 
 interface Props {
   vehicleId: string;
-  stockId:   string;   // needed for storage path
+  stockId:   string;
   canEdit:   boolean;
 }
 
@@ -46,32 +47,33 @@ function formatDate(s: string) {
   return new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function fileIcon(name: string | null) {
-  if (!name) return '📎';
-  const ext = name.split('.').pop()?.toLowerCase();
-  if (['jpg','jpeg','png','webp','gif'].includes(ext ?? '')) return '🖼️';
-  if (ext === 'pdf') return '📄';
+function fileIcon(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  if (['jpg','jpeg','png','webp','gif','bmp'].includes(ext)) return '🖼️';
+  if (ext === 'pdf')                                          return '📄';
+  if (['doc','docx'].includes(ext))                          return '📝';
+  if (['xls','xlsx','csv'].includes(ext))                    return '📊';
   return '📎';
 }
 
 export default function CostTable({ vehicleId, stockId, canEdit }: Props) {
-  const [costs,       setCosts]       = useState<Cost[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [showForm,    setShowForm]    = useState(false);
-  const [editId,      setEditId]      = useState<string | null>(null);
-  const [saving,      setSaving]      = useState(false);
-  const [error,       setError]       = useState('');
-  const [uploading,   setUploading]   = useState(false);
+  const [costs,     setCosts]     = useState<Cost[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [showForm,  setShowForm]  = useState(false);
+  const [editId,    setEditId]    = useState<string | null>(null);
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
-    category:     'repair',
-    description:  '',
-    amount:       '',
-    cost_date:    todayStr(),
-    supplier:     '',
-    receipt_url:  null as string | null,
-    receipt_name: null as string | null,
+    category:      'repair',
+    description:   '',
+    amount:        '',
+    cost_date:     todayStr(),
+    supplier:      '',
+    receipt_files: [] as ReceiptFile[],
   });
 
   useEffect(() => { void loadCosts(); }, [vehicleId]);
@@ -86,66 +88,81 @@ export default function CostTable({ vehicleId, stockId, canEdit }: Props) {
   }
 
   function resetForm() {
-    setForm({ category: 'repair', description: '', amount: '', cost_date: todayStr(), supplier: '', receipt_url: null, receipt_name: null });
+    setForm({ category: 'repair', description: '', amount: '', cost_date: todayStr(), supplier: '', receipt_files: [] });
     setEditId(null);
     setShowForm(false);
     setError('');
+    setUploadProgress('');
   }
 
   function startEdit(cost: Cost) {
     setForm({
-      category:     cost.category,
-      description:  cost.description,
-      amount:       String(cost.amount),
-      cost_date:    cost.cost_date ? cost.cost_date.split('T')[0]! : todayStr(),
-      supplier:     '',
-      receipt_url:  cost.receipt_url,
-      receipt_name: cost.receipt_name,
+      category:      cost.category,
+      description:   cost.description,
+      amount:        String(cost.amount),
+      cost_date:     cost.cost_date ? cost.cost_date.split('T')[0]! : todayStr(),
+      supplier:      '',
+      receipt_files: cost.receipt_files ?? [],
     });
     setEditId(cost.id);
     setShowForm(true);
   }
 
-  async function handleReceiptUpload(file: File) {
+  async function handleFilesSelected(fileList: FileList) {
+    if (fileList.length === 0) return;
     setUploading(true);
     setError('');
+    const newUploads: ReceiptFile[] = [];
+
     try {
       const supabase = createClient();
-      const ext  = file.name.split('.').pop() ?? 'bin';
-      const path = `receipts/${stockId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const total = fileList.length;
 
-      const { error: uploadErr } = await supabase.storage
-        .from('vehicle-media')
-        .upload(path, file, { upsert: false });
+      for (let i = 0; i < total; i++) {
+        const file = fileList[i]!;
+        setUploadProgress(`Uploading ${i + 1} of ${total}: ${file.name}`);
 
-      if (uploadErr) throw uploadErr;
+        const ext  = file.name.split('.').pop()?.toLowerCase() ?? 'bin';
+        const path = `receipts/${stockId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('vehicle-media')
-        .getPublicUrl(path);
+        // Force contentType so Supabase doesn't reject based on extension guessing
+        const contentType = file.type || 'application/octet-stream';
 
-      setForm(f => ({ ...f, receipt_url: publicUrl, receipt_name: file.name }));
+        const { error: uploadErr } = await supabase.storage
+          .from('vehicle-media')
+          .upload(path, file, { upsert: false, contentType });
+
+        if (uploadErr) throw new Error(`"${file.name}" failed: ${uploadErr.message}`);
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('vehicle-media')
+          .getPublicUrl(path);
+
+        newUploads.push({ url: publicUrl, name: file.name });
+      }
+
+      setForm(f => ({ ...f, receipt_files: [...f.receipt_files, ...newUploads] }));
+      setUploadProgress('');
     } catch (err: any) {
-      setError(`Upload failed: ${err?.message ?? String(err)}`);
+      setError(err?.message ?? String(err));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
     }
   }
 
-  function clearReceipt() {
-    setForm(f => ({ ...f, receipt_url: null, receipt_name: null }));
-    if (fileRef.current) fileRef.current.value = '';
+  function removeReceipt(index: number) {
+    setForm(f => ({ ...f, receipt_files: f.receipt_files.filter((_, i) => i !== index) }));
   }
 
   async function handleSubmit() {
     const desc = form.description.trim();
     const amt  = parseFloat(form.amount);
 
-    if (!desc)               { setError('Description is required');          return; }
-    if (!form.amount)        { setError('Amount is required');               return; }
+    if (!desc)                  { setError('Description is required');          return; }
+    if (!form.amount)           { setError('Amount is required');               return; }
     if (isNaN(amt) || amt <= 0) { setError('Amount must be a positive number'); return; }
-    if (!form.cost_date)     { setError('Date is required');                 return; }
+    if (!form.cost_date)        { setError('Date is required');                 return; }
 
     setSaving(true);
     setError('');
@@ -156,12 +173,11 @@ export default function CostTable({ vehicleId, stockId, canEdit }: Props) {
 
     try {
       const payload = {
-        category:     form.category,
-        description:  finalDesc,
-        amount:       amt,
-        cost_date:    form.cost_date,
-        receipt_url:  form.receipt_url,
-        receipt_name: form.receipt_name,
+        category:      form.category,
+        description:   finalDesc,
+        amount:        amt,
+        cost_date:     form.cost_date,
+        receipt_files: form.receipt_files.length > 0 ? form.receipt_files : null,
       };
       if (editId) {
         await adminApi.updateCost(vehicleId, editId, payload);
@@ -283,87 +299,89 @@ export default function CostTable({ vehicleId, stockId, canEdit }: Props) {
             </div>
           </div>
 
-          {/* ── Receipt / Bill upload ── */}
+          {/* ── Receipts / Bills ── */}
           <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>
-              Receipt / Bill <span style={{ fontSize: 10, color: '#3d5270' }}>(optional — image or PDF)</span>
+            <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 6 }}>
+              Receipts / Bills
+              <span style={{ fontSize: 10, color: '#3d5270', marginLeft: 6 }}>
+                (any file type — images, PDF, Word, Excel · multiple allowed)
+              </span>
             </label>
 
-            {form.receipt_url ? (
-              /* Receipt already attached — show it */
-              <div style={{
-                display:      'flex',
-                alignItems:   'center',
-                gap:          10,
-                background:   'rgba(16,185,129,0.07)',
-                border:       '1px solid rgba(16,185,129,0.2)',
-                borderRadius: 6,
-                padding:      '8px 12px',
-              }}>
-                <span style={{ fontSize: 18 }}>{fileIcon(form.receipt_name)}</span>
-                <a
-                  href={form.receipt_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 12, color: '#10b981', textDecoration: 'none', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                >
-                  {form.receipt_name ?? 'View receipt'}
-                </a>
-                <button
-                  onClick={clearReceipt}
-                  title="Remove receipt"
-                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: '0 4px', flexShrink: 0 }}
-                >
-                  ✕
-                </button>
-              </div>
-            ) : (
-              /* Upload button */
-              <div>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="*/*"
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) void handleReceiptUpload(file);
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  style={{
+            {/* Attached files list */}
+            {form.receipt_files.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                {form.receipt_files.map((rf, idx) => (
+                  <div key={idx} style={{
                     display:      'flex',
                     alignItems:   'center',
-                    gap:          7,
-                    background:   'rgba(255,255,255,0.03)',
-                    border:       '1px dashed #1f2d45',
+                    gap:          8,
+                    background:   'rgba(16,185,129,0.07)',
+                    border:       '1px solid rgba(16,185,129,0.18)',
                     borderRadius: 6,
-                    padding:      '8px 14px',
-                    fontSize:     12,
-                    color:        uploading ? '#3d5270' : '#5c7090',
-                    cursor:       uploading ? 'not-allowed' : 'pointer',
-                    transition:   'all 0.18s',
-                    width:        '100%',
-                    justifyContent: 'center',
-                  }}
-                  onMouseEnter={e => { if (!uploading) (e.currentTarget as HTMLButtonElement).style.borderColor = '#3b5270'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#1f2d45'; }}
-                >
-                  {uploading ? (
-                    <>
-                      <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span>
-                      Uploading…
-                    </>
-                  ) : (
-                    <>📎 Attach Receipt / Bill</>
-                  )}
-                </button>
-                <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+                    padding:      '7px 10px',
+                  }}>
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>{fileIcon(rf.name)}</span>
+                    <a
+                      href={rf.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontSize: 12, color: '#10b981', textDecoration: 'none',
+                        flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {rf.name}
+                    </a>
+                    <button
+                      onClick={() => removeReceipt(idx)}
+                      title="Remove"
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, padding: '0 2px', flexShrink: 0 }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
+
+            {/* Upload button / progress */}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="*/*"
+              multiple
+              style={{ display: 'none' }}
+              onChange={e => { if (e.target.files) void handleFilesSelected(e.target.files); }}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              style={{
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'center',
+                gap:            7,
+                width:          '100%',
+                background:     'rgba(255,255,255,0.03)',
+                border:         '1px dashed #1f2d45',
+                borderRadius:   6,
+                padding:        '9px 14px',
+                fontSize:       12,
+                color:          uploading ? '#3d5270' : '#5c7090',
+                cursor:         uploading ? 'not-allowed' : 'pointer',
+                transition:     'border-color 0.18s, color 0.18s',
+              }}
+              onMouseEnter={e => { if (!uploading) { (e.currentTarget as HTMLButtonElement).style.borderColor = '#3b5270'; (e.currentTarget as HTMLButtonElement).style.color = '#8097b8'; } }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#1f2d45'; (e.currentTarget as HTMLButtonElement).style.color = uploading ? '#3d5270' : '#5c7090'; }}
+            >
+              {uploading ? (
+                <>{uploadProgress || 'Uploading…'}</>
+              ) : (
+                <>📎 {form.receipt_files.length > 0 ? 'Add More Files' : 'Attach Files'}</>
+              )}
+            </button>
           </div>
 
           {/* Action buttons */}
@@ -380,7 +398,7 @@ export default function CostTable({ vehicleId, stockId, canEdit }: Props) {
             >
               {saving ? 'Saving…' : editId ? 'Update' : 'Add Cost'}
             </button>
-            <button onClick={resetForm} style={{
+            <button onClick={resetForm} disabled={uploading} style={{
               background: 'none', border: '1px solid #1f2d45',
               borderRadius: 7, padding: '8px 14px', fontSize: 13,
               color: '#5c7090', cursor: 'pointer',
@@ -403,85 +421,95 @@ export default function CostTable({ vehicleId, stockId, canEdit }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#111827' }}>
-                {['Category', 'Description', 'Date', 'Receipt', 'Amount', canEdit ? 'Edit' : ''].filter(Boolean).map(h => (
-                  <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#5c7090', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
+                {['Category', 'Description', 'Date', 'Files', 'Amount', canEdit ? '' : ''].filter(Boolean).map(h => (
+                  <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#5c7090', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {costs.map((cost, i) => (
-                <tr key={cost.id} style={{ borderTop: i > 0 ? '1px solid #1a2535' : 'none' }}>
-                  {/* Category */}
-                  <td style={{ padding: '10px 14px' }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.1)', padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap' }}>
-                      {COST_CATEGORIES.find(c => c.value === cost.category)?.label ?? cost.category}
-                    </span>
-                  </td>
-
-                  {/* Description */}
-                  <td style={{ padding: '10px 14px', color: '#dde4f0', maxWidth: 240 }}>
-                    <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {cost.description}
-                    </span>
-                  </td>
-
-                  {/* Date */}
-                  <td style={{ padding: '10px 14px', color: '#5c7090', whiteSpace: 'nowrap' }}>
-                    {formatDate(cost.cost_date)}
-                  </td>
-
-                  {/* Receipt icon/link */}
-                  <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                    {cost.receipt_url ? (
-                      <a
-                        href={cost.receipt_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={cost.receipt_name ?? 'View receipt'}
-                        style={{
-                          display:        'inline-flex',
-                          alignItems:     'center',
-                          gap:            4,
-                          fontSize:       12,
-                          color:          '#10b981',
-                          textDecoration: 'none',
-                          background:     'rgba(16,185,129,0.08)',
-                          border:         '1px solid rgba(16,185,129,0.18)',
-                          borderRadius:   5,
-                          padding:        '3px 8px',
-                          whiteSpace:     'nowrap',
-                          transition:     'background 0.15s',
-                        }}
-                        onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.15)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.08)'}
-                      >
-                        <span style={{ fontSize: 14 }}>{fileIcon(cost.receipt_name)}</span>
-                        View
-                      </a>
-                    ) : (
-                      <span style={{ color: '#2a3a50', fontSize: 12 }}>—</span>
-                    )}
-                  </td>
-
-                  {/* Amount */}
-                  <td style={{ padding: '10px 14px', fontWeight: 700, color: '#f59e0b', whiteSpace: 'nowrap' }}>
-                    {formatPrice(Number(cost.amount))}
-                  </td>
-
-                  {/* Edit */}
-                  {canEdit && (
+              {costs.map((cost, i) => {
+                const files = cost.receipt_files ?? [];
+                return (
+                  <tr key={cost.id} style={{ borderTop: i > 0 ? '1px solid #1a2535' : 'none' }}>
+                    {/* Category */}
                     <td style={{ padding: '10px 14px' }}>
-                      <button
-                        onClick={() => startEdit(cost)}
-                        title="Edit this entry"
-                        style={{ background: 'none', border: 'none', fontSize: 13, color: '#5c7090', cursor: 'pointer', padding: '2px 6px' }}
-                      >
-                        ✏️
-                      </button>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.1)', padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap' }}>
+                        {COST_CATEGORIES.find(c => c.value === cost.category)?.label ?? cost.category}
+                      </span>
                     </td>
-                  )}
-                </tr>
-              ))}
+
+                    {/* Description */}
+                    <td style={{ padding: '10px 14px', color: '#dde4f0', maxWidth: 220 }}>
+                      <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {cost.description}
+                      </span>
+                    </td>
+
+                    {/* Date */}
+                    <td style={{ padding: '10px 14px', color: '#5c7090', whiteSpace: 'nowrap' }}>
+                      {formatDate(cost.cost_date)}
+                    </td>
+
+                    {/* Files */}
+                    <td style={{ padding: '10px 14px' }}>
+                      {files.length === 0 ? (
+                        <span style={{ color: '#2a3a50', fontSize: 12 }}>—</span>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {files.map((rf, idx) => (
+                            <a
+                              key={idx}
+                              href={rf.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={rf.name}
+                              style={{
+                                display:        'inline-flex',
+                                alignItems:     'center',
+                                gap:            3,
+                                fontSize:       11,
+                                color:          '#10b981',
+                                textDecoration: 'none',
+                                background:     'rgba(16,185,129,0.08)',
+                                border:         '1px solid rgba(16,185,129,0.18)',
+                                borderRadius:   4,
+                                padding:        '2px 7px',
+                                whiteSpace:     'nowrap',
+                                transition:     'background 0.15s',
+                              }}
+                              onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.16)'}
+                              onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.08)'}
+                            >
+                              <span style={{ fontSize: 13 }}>{fileIcon(rf.name)}</span>
+                              {files.length === 1 ? 'View' : `File ${idx + 1}`}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Amount */}
+                    <td style={{ padding: '10px 14px', fontWeight: 700, color: '#f59e0b', whiteSpace: 'nowrap' }}>
+                      {formatPrice(Number(cost.amount))}
+                    </td>
+
+                    {/* Edit */}
+                    {canEdit && (
+                      <td style={{ padding: '10px 14px' }}>
+                        <button
+                          onClick={() => startEdit(cost)}
+                          title="Edit"
+                          style={{ background: 'none', border: 'none', fontSize: 13, color: '#5c7090', cursor: 'pointer', padding: '2px 6px' }}
+                        >
+                          ✏️
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr style={{ borderTop: '2px solid #1f2d45', background: '#111827' }}>
