@@ -159,6 +159,7 @@ function MonthGrid({ year, month, range, hovered, onDayClick, onDayHover, isDark
           const isToday   = isSameDay(day, today);
           const fullRange = inRange(day, range.start, range.end);
 
+          // Hover preview when only start selected
           let hovPreview = false;
           if (!range.end && range.start && hovered) {
             const lo = range.start <= hovered ? range.start : hovered;
@@ -210,18 +211,22 @@ function DateRangeFilter({ isDark, range, onChange }: {
   const btnRef  = useRef<HTMLButtonElement>(null);
   const popRef  = useRef<HTMLDivElement>(null);
 
+  // Recompute popup position when opening
   function openPicker() {
     if (!btnRef.current) return;
     const r = btnRef.current.getBoundingClientRect();
-    const popH = 380;
+    // Try to open below the button; if it would go off screen, open above
+    const popH = 380; // approximate height
     const spaceBelow = window.innerHeight - r.bottom - 8;
     const top = spaceBelow >= popH ? r.bottom + 6 : r.top - popH - 6;
     let left = r.left;
+    // Clamp so popup doesn't go off right edge (popup is ~580px wide)
     if (left + 580 > window.innerWidth - 8) left = window.innerWidth - 588;
     setPopPos({ top, left });
     setOpen(true);
   }
 
+  // Close on outside click
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
@@ -270,6 +275,7 @@ function DateRangeFilter({ isDark, range, onChange }: {
       ? `From ${fmtShort(range.start)}`
       : 'Date Range';
 
+  // Check if a preset is active
   function isPresetActive(p: typeof PRESETS[0]) {
     if (!range.start || !range.end) return false;
     const pr = p.fn();
@@ -286,6 +292,7 @@ function DateRangeFilter({ isDark, range, onChange }: {
         boxShadow: isDark ? '0 24px 60px rgba(0,0,0,0.7)' : '0 12px 40px rgba(0,0,0,0.2)',
         display: 'flex', overflow: 'hidden', width: 580, userSelect: 'none' as const }}>
 
+      {/* Presets sidebar */}
       <div style={{ width: 140, flexShrink: 0, borderRight: `1px solid ${calBorder}`,
         padding: '14px 8px', display: 'flex', flexDirection: 'column', gap: 2,
         background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.04)' }}>
@@ -308,7 +315,9 @@ function DateRangeFilter({ isDark, range, onChange }: {
         })}
       </div>
 
+      {/* Calendar area */}
       <div style={{ flex: 1, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Nav */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button onClick={prevMonth}
             style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${calBorder}`,
@@ -325,6 +334,7 @@ function DateRangeFilter({ isDark, range, onChange }: {
               display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
         </div>
 
+        {/* Two months */}
         <div style={{ display: 'flex', gap: 16 }}>
           <MonthGrid year={viewYear} month={viewMonth} range={range} hovered={hovered}
             picking={picking} onDayClick={handleDayClick} onDayHover={setHovered} isDark={isDark} />
@@ -333,6 +343,7 @@ function DateRangeFilter({ isDark, range, onChange }: {
             picking={picking} onDayClick={handleDayClick} onDayHover={setHovered} isDark={isDark} />
         </div>
 
+        {/* Footer */}
         <div style={{ borderTop: `1px solid ${calBorder}`, paddingTop: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 12, color: t.muted }}>
@@ -493,17 +504,9 @@ function StatCard({ label, value, color, sub, onClick, isDark }: {
   );
 }
 
-// ─── Main page ─────────────────────────────────────────────────────────────────
-function CrmPageInner() {
+// ─── Main page content (UNCHANGED logic, just moved) ───────────────────────────
+function CrmPageContent() {
   const { isDark } = useTheme();
-
-  // ✅ FIX: Prevent wrong theme flash / hydration mismatch on hard reload
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
-  if (!mounted) {
-    return <div style={{ padding: 40, color: '#5a7295', fontSize: 13 }}>Loading…</div>;
-  }
-
   const t = tok(isDark);
 
   const [leads,        setLeads]        = useState<Lead[]>([]);
@@ -762,6 +765,16 @@ function CrmPageInner() {
       `}</style>
     </div>
   );
+}
+
+// ─── Wrapper that fixes reload theme flip WITHOUT breaking hooks ───────────────
+function CrmPageInner() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) {
+    return <div style={{ padding: 40, color: '#5a7295', fontSize: 13 }}>Loading…</div>;
+  }
+  return <CrmPageContent />;
 }
 
 export default function CrmPage() {
