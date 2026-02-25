@@ -464,3 +464,175 @@ export const customerApi = {
   deleteNote: (customerId: string, noteId: string) =>
     adminFetch<{ message: string }>(`/customers/${customerId}/notes/${noteId}`, { method: 'DELETE' }),
 };
+
+// ─────────────────────────────────────────────────────────────
+// CRM TYPES — Phase 4
+// ─────────────────────────────────────────────────────────────
+
+export type LeadStatus =
+  | 'new' | 'contacted' | 'interested' | 'test_drive'
+  | 'negotiation' | 'won' | 'lost';
+
+export type LeadSource =
+  | 'walk_in' | 'call' | 'website' | 'facebook'
+  | 'whatsapp' | 'referral' | 'other';
+
+export type LostReason =
+  | 'price_too_high' | 'competitor' | 'not_interested'
+  | 'financing_rejected' | 'other';
+
+export interface Lead {
+  id:                      string;
+  lead_code:               string;
+  customer_id:             string | null;
+  customer_name:           string;
+  customer_phone:          string;
+  interested_vehicle_id:   string | null;
+  interested_vehicle_desc: string | null;
+  source:                  LeadSource;
+  assigned_to:             string;
+  status:                  LeadStatus;
+  next_followup_date:      string | null;
+  next_followup_note:      string | null;
+  lost_reason:             LostReason | null;
+  won_deal_id:             string | null;
+  created_at:              string;
+  updated_at:              string;
+}
+
+export interface LeadFollowUp {
+  id:                 string;
+  lead_id?:           string;
+  follow_up_date:     string;
+  status_at_time:     string;
+  notes:              string;
+  next_followup_date: string | null;
+  created_by:         string;
+  created_at:         string;
+}
+
+export interface LeadDetail extends Lead {
+  lost_note:   string | null;
+  created_by:  string;
+  follow_ups:  LeadFollowUp[];
+  vehicle: {
+    id:             string;
+    stock_id:       string;
+    make:           string;
+    model:          string;
+    year:           number;
+    asking_price:   number;
+    status:         string;
+    main_image_url: string | null;
+  } | null;
+  customer: {
+    id:            string;
+    customer_code: string;
+    full_name:     string;
+    phone_primary: string;
+    status:        string;
+  } | null;
+}
+
+export interface Salesperson {
+  id:            string;
+  full_name:     string;
+  employee_code: string;
+  role:          string;
+}
+
+export interface VehicleSearchResult {
+  id:             string;
+  stock_id:       string;
+  make:           string;
+  model:          string;
+  year:           number;
+  asking_price:   number;
+  status:         string;
+  main_image_url: string | null;
+}
+
+export interface LeadListParams {
+  page?:         number;
+  limit?:        number;
+  status?:       string;
+  source?:       string;
+  assigned_to?:  string;
+  search?:       string;
+  date_from?:    string;
+  date_to?:      string;
+  overdue_only?: boolean;
+}
+
+export interface CreateLeadData {
+  customer_id?:             string;
+  customer_name:            string;
+  customer_phone:           string;
+  interested_vehicle_id?:   string;
+  interested_vehicle_desc?: string;
+  source:                   LeadSource;
+  assigned_to:              string;
+  next_followup_date?:      string;
+  next_followup_note?:      string;
+}
+
+// ─────────────────────────────────────────────────────────────
+// LEAD API — Phase 4
+// ─────────────────────────────────────────────────────────────
+
+export const leadApi = {
+  list: (params: LeadListParams = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '' && v !== false) qs.set(k, String(v));
+    });
+    return adminFetch<{ leads: Lead[]; pagination: Pagination }>(
+      `/leads${qs.toString() ? '?' + qs.toString() : ''}`
+    );
+  },
+
+  get: (id: string) =>
+    adminFetch<LeadDetail>(`/leads/${id}`),
+
+  getOverdue: () =>
+    adminFetch<Lead[]>('/leads/overdue'),
+
+  getDueToday: () =>
+    adminFetch<Lead[]>('/leads/due-today'),
+
+  getSalespersons: () =>
+    adminFetch<Salesperson[]>('/leads/salespersons'),
+
+  searchVehicles: (q: string) =>
+    adminFetch<VehicleSearchResult[]>(`/leads/vehicles/search?q=${encodeURIComponent(q)}`),
+
+  create: (data: CreateLeadData) =>
+    adminFetch<Lead>('/leads', { method: 'POST', body: JSON.stringify(data) }),
+
+  update: (id: string, data: Partial<CreateLeadData>) =>
+    adminFetch<Lead>(`/leads/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  patchStatus: (id: string, status: LeadStatus, lost_reason?: LostReason, lost_note?: string) =>
+    adminFetch<Lead>(`/leads/${id}/status`, {
+      method: 'PATCH',
+      body:   JSON.stringify({ status, lost_reason, lost_note }),
+    }),
+
+  reassign: (id: string, assigned_to: string) =>
+    adminFetch<Lead>(`/leads/${id}/assign`, {
+      method: 'PATCH',
+      body:   JSON.stringify({ assigned_to }),
+    }),
+
+  softDelete: (id: string) =>
+    adminFetch<{ message: string }>(`/leads/${id}`, { method: 'DELETE' }),
+
+  getFollowUps: (id: string) =>
+    adminFetch<LeadFollowUp[]>(`/leads/${id}/follow-ups`),
+
+  addFollowUp: (id: string, data: { follow_up_date: string; notes: string; next_followup_date?: string }) =>
+    adminFetch<LeadFollowUp>(`/leads/${id}/follow-ups`, {
+      method: 'POST',
+      body:   JSON.stringify(data),
+    }),
+};
