@@ -159,7 +159,6 @@ function MonthGrid({ year, month, range, hovered, onDayClick, onDayHover, isDark
           const isToday   = isSameDay(day, today);
           const fullRange = inRange(day, range.start, range.end);
 
-          // Hover preview when only start selected
           let hovPreview = false;
           if (!range.end && range.start && hovered) {
             const lo = range.start <= hovered ? range.start : hovered;
@@ -211,22 +210,18 @@ function DateRangeFilter({ isDark, range, onChange }: {
   const btnRef  = useRef<HTMLButtonElement>(null);
   const popRef  = useRef<HTMLDivElement>(null);
 
-  // Recompute popup position when opening
   function openPicker() {
     if (!btnRef.current) return;
     const r = btnRef.current.getBoundingClientRect();
-    // Try to open below the button; if it would go off screen, open above
-    const popH = 380; // approximate height
+    const popH = 380;
     const spaceBelow = window.innerHeight - r.bottom - 8;
     const top = spaceBelow >= popH ? r.bottom + 6 : r.top - popH - 6;
     let left = r.left;
-    // Clamp so popup doesn't go off right edge (popup is ~580px wide)
     if (left + 580 > window.innerWidth - 8) left = window.innerWidth - 588;
     setPopPos({ top, left });
     setOpen(true);
   }
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
@@ -275,7 +270,6 @@ function DateRangeFilter({ isDark, range, onChange }: {
       ? `From ${fmtShort(range.start)}`
       : 'Date Range';
 
-  // Check if a preset is active
   function isPresetActive(p: typeof PRESETS[0]) {
     if (!range.start || !range.end) return false;
     const pr = p.fn();
@@ -396,6 +390,8 @@ function DateRangeFilter({ isDark, range, onChange }: {
 }
 
 // ─── Leads Table ───────────────────────────────────────────────────────────────
+const GRID_COLS = '2.2fr 2fr 1fr 1.3fr 1.5fr 1.2fr 56px';
+
 function LeadsTable({ leads, salespersons, isDark }: {
   leads: Lead[]; salespersons: Salesperson[]; isDark: boolean;
 }) {
@@ -409,27 +405,30 @@ function LeadsTable({ leads, salespersons, isDark }: {
   );
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '2.2fr 2fr 1fr 1.3fr 1.5fr 1.2fr',
+      {/* Header */}
+      <div style={{ display: 'grid', gridTemplateColumns: GRID_COLS,
         padding: '8px 20px', borderBottom: `1px solid ${t.border}`,
         fontSize: 10, fontWeight: 700, color: t.muted, letterSpacing: '0.08em', textTransform: 'uppercase',
         background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' }}>
         <div>Customer</div><div>Vehicle Interest</div><div>Source</div>
-        <div>Status</div><div>Follow-up</div><div>Assigned</div>
+        <div>Status</div><div>Follow-up</div><div>Assigned</div><div />
       </div>
+
       {leads.map(lead => {
         const sp      = salespersons.find(s => s.id === lead.assigned_to);
         const overdue = isOverdue(lead.next_followup_date, lead.status);
         const today   = isDueToday(lead.next_followup_date, lead.status);
         const fDate   = fmtDate(lead.next_followup_date);
         return (
-          <Link key={lead.id} href={`/admin/crm/${lead.id}`}
-            style={{ display: 'grid', gridTemplateColumns: '2.2fr 2fr 1fr 1.3fr 1.5fr 1.2fr',
+          <div key={lead.id}
+            style={{ display: 'grid', gridTemplateColumns: GRID_COLS,
               padding: '13px 20px', borderBottom: `1px solid ${t.border}`,
-              textDecoration: 'none', alignItems: 'center', transition: 'background 0.1s',
+              alignItems: 'center', transition: 'background 0.1s',
               background: 'transparent' }}
-            onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'}
-            onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'}>
+            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'}
+            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}>
 
+            {/* Customer */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
               <Avatar name={lead.customer_name} />
               <div style={{ minWidth: 0 }}>
@@ -441,12 +440,14 @@ function LeadsTable({ leads, salespersons, isDark }: {
               </div>
             </div>
 
+            {/* Vehicle */}
             <div style={{ minWidth: 0, paddingRight: 8 }}>
               {lead.interested_vehicle_desc
                 ? <div style={{ fontSize: 12, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🚗 {lead.interested_vehicle_desc}</div>
                 : <span style={{ fontSize: 12, color: t.muted, fontStyle: 'italic' }}>Not specified</span>}
             </div>
 
+            {/* Source */}
             <div>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11,
                 color: t.muted, background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
@@ -455,8 +456,10 @@ function LeadsTable({ leads, salespersons, isDark }: {
               </span>
             </div>
 
+            {/* Status */}
             <div><StatusBadge status={lead.status} /></div>
 
+            {/* Follow-up */}
             <div>
               {fDate ? (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600,
@@ -469,6 +472,7 @@ function LeadsTable({ leads, salespersons, isDark }: {
               ) : <span style={{ fontSize: 11, color: t.muted }}>—</span>}
             </div>
 
+            {/* Assigned */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
               {sp ? (
                 <><Avatar name={sp.full_name} size={24} />
@@ -478,7 +482,23 @@ function LeadsTable({ leads, salespersons, isDark }: {
                   </span></>
               ) : <span style={{ fontSize: 11, color: t.muted, fontStyle: 'italic' }}>Unassigned</span>}
             </div>
-          </Link>
+
+            {/* ── View link ── */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Link
+                href={`/admin/crm/${lead.id}`}
+                onClick={e => e.stopPropagation()}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 3,
+                  fontSize: 11, fontWeight: 700, color: t.accent,
+                  background: t.accentBg, border: `1px solid ${t.accentBdr}`,
+                  borderRadius: 7, padding: '4px 9px', textDecoration: 'none',
+                  whiteSpace: 'nowrap', transition: 'all 0.12s' }}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLAnchorElement; el.style.background = 'rgba(16,185,129,0.2)'; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLAnchorElement; el.style.background = t.accentBg; }}>
+                View →
+              </Link>
+            </div>
+          </div>
         );
       })}
     </div>
@@ -504,7 +524,7 @@ function StatCard({ label, value, color, sub, onClick, isDark }: {
   );
 }
 
-// ─── Main page content (UNCHANGED logic, just moved) ───────────────────────────
+// ─── Main page content ─────────────────────────────────────────────────────────
 function CrmPageContent() {
   const { isDark } = useTheme();
   const t = tok(isDark);
@@ -624,7 +644,7 @@ function CrmPageContent() {
         </button>
       )}
 
-      {/* Main card — NO overflow:hidden on the outer wrapper */}
+      {/* Main card */}
       <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 14,
         boxShadow: isDark ? '0 4px 24px rgba(0,0,0,0.4)' : '0 2px 12px rgba(0,0,0,0.08)' }}>
 
@@ -655,7 +675,6 @@ function CrmPageContent() {
         {/* Toolbar */}
         <div style={{ padding: '10px 18px', borderBottom: `1px solid ${t.border}`,
           display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Search */}
           <div style={{ flex: 1, minWidth: 180, position: 'relative' }}>
             <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
               fontSize: 13, color: t.muted, pointerEvents: 'none' }}>🔍</span>
@@ -663,21 +682,17 @@ function CrmPageContent() {
               placeholder="Search name, phone, vehicle…"
               style={{ ...inputStyle, width: '100%', paddingLeft: 32, boxSizing: 'border-box' }} />
           </div>
-          {/* Source */}
           <select value={filterSource} onChange={e => setFilterSource(e.target.value as LeadSource | '')}
             style={{ ...selectStyle, minWidth: 120 }}>
             <option value="">All Sources</option>
             {Object.entries(SRC_CFG).map(([v, c]) => <option key={v} value={v}>{c.icon} {c.label}</option>)}
           </select>
-          {/* Salesperson */}
           <select value={filterSP} onChange={e => setFilterSP(e.target.value)}
             style={{ ...selectStyle, minWidth: 140 }}>
             <option value="">All Salespersons</option>
             {salespersons.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
           </select>
-          {/* Date range */}
           <DateRangeFilter isDark={isDark} range={dateRange} onChange={setDateRange} />
-          {/* Overdue chip */}
           {overdueOnly && (
             <button onClick={() => setOverdueOnly(false)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -687,7 +702,6 @@ function CrmPageContent() {
               ⚠️ Overdue ✕
             </button>
           )}
-          {/* Clear all */}
           {hasFilters && (
             <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterSource(''); setFilterSP(''); setOverdueOnly(false); setDateRange({ start: null, end: null }); }}
               style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 8,
