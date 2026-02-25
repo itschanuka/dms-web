@@ -129,14 +129,19 @@ export default function CostTable({ vehicleId, stockId, canEdit }: Props) {
         const contentType = file.type || 'application/octet-stream';
 
         const { error: uploadErr } = await supabase.storage
-          .from('vehicle-media')
+          .from('customer-docs')
           .upload(path, file, { upsert: false, contentType });
 
         if (uploadErr) throw new Error(`"${file.name}" failed: ${uploadErr.message}`);
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('vehicle-media')
-          .getPublicUrl(path);
+        // customer-docs is private — generate a long-lived signed URL (10 years)
+        const { data: signedData, error: signErr } = await supabase.storage
+          .from('customer-docs')
+          .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+
+        if (signErr || !signedData?.signedUrl) throw new Error(`"${file.name}" failed: could not generate signed URL`);
+
+        const publicUrl = signedData.signedUrl;
 
         newUploads.push({ url: publicUrl, name: file.name });
       }
