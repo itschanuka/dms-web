@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AdminShell from '@/components/admin/AdminShell';
 import {
@@ -29,11 +29,8 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-// ── Inner form — uses useSearchParams so must be inside <Suspense> ─
-
-function NewLeadForm() {
+export default function NewLeadPage() {
   const router       = useRouter();
-  const searchParams = useSearchParams();
   const { isDark }   = useTheme();
   const { employee } = useAuth();
 
@@ -66,12 +63,12 @@ function NewLeadForm() {
   });
 
   const c = {
-    bg:   isDark ? '#07090f' : '#f0f4f8',
-    card: isDark ? '#0d1117' : '#ffffff',
+    bg:     isDark ? '#07090f' : '#f0f4f8',
+    card:   isDark ? '#0d1117' : '#ffffff',
     border: isDark ? '#1f2d45' : '#d0dcea',
-    text: isDark ? '#dde4f0' : '#1a2535',
-    muted: isDark ? '#5c7090' : '#6b7fa0',
-    drop: isDark ? '#111827' : '#f8fafc',
+    text:   isDark ? '#dde4f0' : '#1a2535',
+    muted:  isDark ? '#5c7090' : '#6b7fa0',
+    drop:   isDark ? '#111827' : '#f8fafc',
   };
 
   const F: React.CSSProperties = {
@@ -80,9 +77,12 @@ function NewLeadForm() {
     outline: 'none', boxSizing: 'border-box',
   };
 
+  // Read customer_id from URL without useSearchParams
   useEffect(() => {
     leadApi.getSalespersons().then(setSalespersons).catch(() => {});
-    const preCustomerId = searchParams.get('customer_id');
+
+    const params = new URLSearchParams(window.location.search);
+    const preCustomerId = params.get('customer_id');
     if (preCustomerId) {
       customerApi.get(preCustomerId).then(cust => {
         setSelectedCustomer(cust);
@@ -94,7 +94,7 @@ function NewLeadForm() {
         }));
       }).catch(() => {});
     }
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
     if (employee && employee.role === 'salesperson') {
@@ -212,12 +212,7 @@ function NewLeadForm() {
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: c.muted, marginBottom: 5 }}>Search Existing Customer (optional)</label>
                 <div style={{ position: 'relative' }}>
-                  <input
-                    value={customerQuery}
-                    onChange={e => setCustomerQuery(e.target.value)}
-                    placeholder="Type name or phone to search…"
-                    style={F}
-                  />
+                  <input value={customerQuery} onChange={e => setCustomerQuery(e.target.value)} placeholder="Type name or phone to search…" style={F} />
                   {customerSearching && (
                     <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: c.muted }}>Searching…</div>
                   )}
@@ -265,12 +260,7 @@ function NewLeadForm() {
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: c.muted, marginBottom: 5 }}>Search Inventory Vehicle (optional)</label>
                 <div style={{ position: 'relative' }}>
-                  <input
-                    value={vehicleQuery}
-                    onChange={e => setVehicleQuery(e.target.value)}
-                    placeholder="Type make, model or stock ID…"
-                    style={F}
-                  />
+                  <input value={vehicleQuery} onChange={e => setVehicleQuery(e.target.value)} placeholder="Type make, model or stock ID…" style={F} />
                   {vehicleSearching && (
                     <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: c.muted }}>Searching…</div>
                   )}
@@ -345,19 +335,5 @@ function NewLeadForm() {
         </form>
       </div>
     </AdminShell>
-  );
-}
-
-// ── Suspense wrapper — required by Next.js for useSearchParams ─
-
-export default function NewLeadPage() {
-  return (
-    <Suspense fallback={
-      <AdminShell>
-        <div style={{ padding: 40, textAlign: 'center', color: '#5c7090' }}>Loading…</div>
-      </AdminShell>
-    }>
-      <NewLeadForm />
-    </Suspense>
   );
 }
