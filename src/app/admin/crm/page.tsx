@@ -1,9 +1,7 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminShell from '@/components/admin/AdminShell';
 import {
@@ -31,37 +29,40 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-export default function NewLeadPage() {
+function NewLeadForm() {
   const router       = useRouter();
+  const searchParams = useSearchParams();
   const { isDark }   = useTheme();
   const { employee } = useAuth();
 
-  const [saving,       setSaving]       = useState(false);
-  const [error,        setError]        = useState('');
-  const [salespersons, setSalespersons] = useState<Salesperson[]>([]);
+  const [saving,        setSaving]        = useState(false);
+  const [error,         setError]         = useState('');
+  const [salespersons,  setSalespersons]  = useState<Salesperson[]>([]);
 
-  const [vehicleQuery,     setVehicleQuery]     = useState('');
-  const [vehicleResults,   setVehicleResults]   = useState<VehicleSearchResult[]>([]);
+  // Vehicle search state
+  const [vehicleQuery,    setVehicleQuery]    = useState('');
+  const [vehicleResults,  setVehicleResults]  = useState<VehicleSearchResult[]>([]);
   const [vehicleSearching, setVehicleSearching] = useState(false);
-  const [selectedVehicle,  setSelectedVehicle]  = useState<VehicleSearchResult | null>(null);
+  const [selectedVehicle, setSelectedVehicle]  = useState<VehicleSearchResult | null>(null);
   const vehicleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [customerQuery,     setCustomerQuery]     = useState('');
-  const [customerResults,   setCustomerResults]   = useState<Customer[]>([]);
+  // Customer lookup state
+  const [customerQuery,   setCustomerQuery]   = useState('');
+  const [customerResults, setCustomerResults] = useState<Customer[]>([]);
   const [customerSearching, setCustomerSearching] = useState(false);
-  const [selectedCustomer,  setSelectedCustomer]  = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const customerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [form, setForm] = useState<CreateLeadData>({
-    customer_id:             '',
-    customer_name:           '',
-    customer_phone:          '',
-    interested_vehicle_id:   '',
+    customer_id:            '',
+    customer_name:          '',
+    customer_phone:         '',
+    interested_vehicle_id:  '',
     interested_vehicle_desc: '',
-    source:                  'walk_in',
-    assigned_to:             '',
-    next_followup_date:      '',
-    next_followup_note:      '',
+    source:                 'walk_in',
+    assigned_to:            '',
+    next_followup_date:     '',
+    next_followup_note:     '',
   });
 
   const c = {
@@ -79,42 +80,46 @@ export default function NewLeadPage() {
     outline: 'none', boxSizing: 'border-box',
   };
 
-  // Read customer_id from URL without useSearchParams
+  // Load salespersons + pre-fill customer_id from query param
   useEffect(() => {
     leadApi.getSalespersons().then(setSalespersons).catch(() => {});
 
-    const params = new URLSearchParams(window.location.search);
-    const preCustomerId = params.get('customer_id');
+    const preCustomerId = searchParams.get('customer_id');
     if (preCustomerId) {
-      customerApi.get(preCustomerId).then(cust => {
-        setSelectedCustomer(cust);
+      customerApi.get(preCustomerId).then(c => {
+        setSelectedCustomer(c);
         setForm(f => ({
           ...f,
-          customer_id:    cust.id,
-          customer_name:  cust.full_name,
-          customer_phone: cust.phone_primary,
+          customer_id:    c.id,
+          customer_name:  c.full_name,
+          customer_phone: c.phone_primary,
         }));
       }).catch(() => {});
     }
-  }, []);
+  }, [searchParams]);
 
+  // Auto-assign to current employee if salesperson
   useEffect(() => {
     if (employee && employee.role === 'salesperson') {
       setForm(f => ({ ...f, assigned_to: employee.id }));
     }
   }, [employee]);
 
+  // Debounced vehicle search
   useEffect(() => {
     if (!vehicleQuery || vehicleQuery.length < 2) { setVehicleResults([]); return; }
     if (vehicleTimerRef.current) clearTimeout(vehicleTimerRef.current);
     vehicleTimerRef.current = setTimeout(async () => {
       setVehicleSearching(true);
-      try { setVehicleResults(await leadApi.searchVehicles(vehicleQuery)); }
-      catch { /* ignore */ } finally { setVehicleSearching(false); }
+      try {
+        const res = await leadApi.searchVehicles(vehicleQuery);
+        setVehicleResults(res);
+      } catch { /* ignore */ } finally { setVehicleSearching(false); }
     }, 400);
     return () => { if (vehicleTimerRef.current) clearTimeout(vehicleTimerRef.current); };
   }, [vehicleQuery]);
 
+  // Debounced customer search
   useEffect(() => {
     if (!customerQuery || customerQuery.length < 2) { setCustomerResults([]); return; }
     if (customerTimerRef.current) clearTimeout(customerTimerRef.current);
@@ -148,15 +153,15 @@ export default function NewLeadPage() {
     setForm(f => ({ ...f, interested_vehicle_id: '', interested_vehicle_desc: '' }));
   }
 
-  function pickCustomer(cust: Customer) {
-    setSelectedCustomer(cust);
+  function pickCustomer(c: Customer) {
+    setSelectedCustomer(c);
     setCustomerResults([]);
     setCustomerQuery('');
     setForm(f => ({
       ...f,
-      customer_id:    cust.id,
-      customer_name:  cust.full_name,
-      customer_phone: cust.phone_primary,
+      customer_id:    c.id,
+      customer_name:  c.full_name,
+      customer_phone: c.phone_primary,
     }));
   }
 
@@ -167,20 +172,20 @@ export default function NewLeadPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.customer_name.trim())  { setError('Customer name is required');  return; }
-    if (!form.customer_phone.trim()) { setError('Customer phone is required'); return; }
-    if (!form.assigned_to)           { setError('Salesperson is required');     return; }
+    if (!form.customer_name.trim())  { setError('Customer name is required');   return; }
+    if (!form.customer_phone.trim()) { setError('Customer phone is required');  return; }
+    if (!form.assigned_to)           { setError('Salesperson is required');      return; }
 
     setSaving(true);
     setError('');
     try {
       const lead = await leadApi.create({
         ...form,
-        customer_id:             form.customer_id            || undefined,
-        interested_vehicle_id:   form.interested_vehicle_id  || undefined,
+        customer_id:            form.customer_id            || undefined,
+        interested_vehicle_id:  form.interested_vehicle_id  || undefined,
         interested_vehicle_desc: form.interested_vehicle_desc || undefined,
-        next_followup_date:      form.next_followup_date     || undefined,
-        next_followup_note:      form.next_followup_note     || undefined,
+        next_followup_date:     form.next_followup_date     || undefined,
+        next_followup_note:     form.next_followup_note     || undefined,
       });
       router.push(`/admin/crm/${lead.id}`);
     } catch (err) {
@@ -190,8 +195,9 @@ export default function NewLeadPage() {
   }
 
   return (
-    <AdminShell>
       <div style={{ padding: '28px 32px', maxWidth: 780 }}>
+
+        {/* ── Header ── */}
         <div style={{ marginBottom: 28 }}>
           <Link href="/admin/crm" style={{ fontSize: 12, color: c.muted, textDecoration: 'none' }}>← Back to CRM</Link>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: c.text, margin: '10px 0 4px' }}>New Lead</h1>
@@ -206,22 +212,38 @@ export default function NewLeadPage() {
 
         <form onSubmit={handleSubmit}>
 
-          {/* ── Customer ── */}
+          {/* ── Customer Section ── */}
           <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 12, padding: 24, marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: c.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 18 }}>Customer</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: c.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 18 }}>
+              Customer
+            </div>
 
+            {/* Customer search / link */}
             {!selectedCustomer ? (
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: c.muted, marginBottom: 5 }}>Search Existing Customer (optional)</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: c.muted, marginBottom: 5 }}>
+                  Search Existing Customer (optional)
+                </label>
                 <div style={{ position: 'relative' }}>
-                  <input value={customerQuery} onChange={e => setCustomerQuery(e.target.value)} placeholder="Type name or phone to search…" style={F} />
+                  <input
+                    value={customerQuery}
+                    onChange={e => setCustomerQuery(e.target.value)}
+                    placeholder="Type name or phone to search…"
+                    style={F}
+                  />
                   {customerSearching && (
                     <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: c.muted }}>Searching…</div>
                   )}
                   {customerResults.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: c.drop, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                      background: c.drop, border: `1px solid ${c.border}`, borderRadius: 8,
+                      marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                    }}>
                       {customerResults.map(cust => (
-                        <div key={cust.id} onClick={() => pickCustomer(cust)}
+                        <div
+                          key={cust.id}
+                          onClick={() => pickCustomer(cust)}
                           style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: `1px solid ${c.border}` }}
                           onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'}
                           onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
@@ -235,7 +257,11 @@ export default function NewLeadPage() {
                 </div>
               </div>
             ) : (
-              <div style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{
+                background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)',
+                borderRadius: 8, padding: '10px 14px', marginBottom: 16,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#10b981' }}>{selectedCustomer.full_name}</div>
                   <div style={{ fontSize: 11, color: c.muted }}>{selectedCustomer.phone_primary} · {selectedCustomer.customer_code}</div>
@@ -256,20 +282,35 @@ export default function NewLeadPage() {
 
           {/* ── Vehicle Interest ── */}
           <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 12, padding: 24, marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: c.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 18 }}>Vehicle Interest</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: c.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 18 }}>
+              Vehicle Interest
+            </div>
 
             {!selectedVehicle ? (
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: c.muted, marginBottom: 5 }}>Search Inventory Vehicle (optional)</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: c.muted, marginBottom: 5 }}>
+                  Search Inventory Vehicle (optional)
+                </label>
                 <div style={{ position: 'relative' }}>
-                  <input value={vehicleQuery} onChange={e => setVehicleQuery(e.target.value)} placeholder="Type make, model or stock ID…" style={F} />
+                  <input
+                    value={vehicleQuery}
+                    onChange={e => setVehicleQuery(e.target.value)}
+                    placeholder="Type make, model or stock ID…"
+                    style={F}
+                  />
                   {vehicleSearching && (
                     <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: c.muted }}>Searching…</div>
                   )}
                   {vehicleResults.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: c.drop, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4, maxHeight: 240, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                      background: c.drop, border: `1px solid ${c.border}`, borderRadius: 8,
+                      marginTop: 4, maxHeight: 240, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                    }}>
                       {vehicleResults.map(v => (
-                        <div key={v.id} onClick={() => pickVehicle(v)}
+                        <div
+                          key={v.id}
+                          onClick={() => pickVehicle(v)}
                           style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: `1px solid ${c.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                           onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'}
                           onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
@@ -286,7 +327,11 @@ export default function NewLeadPage() {
                 </div>
               </div>
             ) : (
-              <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{
+                background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)',
+                borderRadius: 8, padding: '10px 14px', marginBottom: 16,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b' }}>{selectedVehicle.year} {selectedVehicle.make} {selectedVehicle.model}</div>
                   <div style={{ fontSize: 11, color: c.muted }}>{selectedVehicle.stock_id} · {formatPrice(selectedVehicle.asking_price)}</div>
@@ -296,23 +341,34 @@ export default function NewLeadPage() {
             )}
 
             <Field label="Vehicle Description (free text)">
-              <input value={form.interested_vehicle_desc} onChange={e => set('interested_vehicle_desc', e.target.value)} style={F} placeholder="e.g. Toyota Aqua 2020, any color" />
+              <input
+                value={form.interested_vehicle_desc}
+                onChange={e => set('interested_vehicle_desc', e.target.value)}
+                style={F}
+                placeholder="e.g. Toyota Aqua 2020, any color"
+              />
             </Field>
           </div>
 
           {/* ── Lead Details ── */}
           <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 12, padding: 24, marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: c.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 18 }}>Lead Details</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: c.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 18 }}>
+              Lead Details
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <Field label="Source" required>
                 <select value={form.source} onChange={e => set('source', e.target.value as LeadSource)} style={F}>
-                  {Object.entries(SOURCE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  {Object.entries(SOURCE_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
                 </select>
               </Field>
               <Field label="Assign To" required>
                 <select value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)} style={F}>
                   <option value="">— Select salesperson —</option>
-                  {salespersons.map(s => <option key={s.id} value={s.id}>{s.full_name} ({s.role})</option>)}
+                  {salespersons.map(s => (
+                    <option key={s.id} value={s.id}>{s.full_name} ({s.role})</option>
+                  ))}
                 </select>
               </Field>
               <Field label="Next Follow-up Date">
@@ -326,7 +382,15 @@ export default function NewLeadPage() {
 
           {/* ── Actions ── */}
           <div style={{ display: 'flex', gap: 10 }}>
-            <button type="submit" disabled={saving} style={{ background: saving ? '#0a6647' : '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer' }}>
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                background: saving ? '#0a6647' : '#10b981', color: '#fff',
+                border: 'none', borderRadius: 8, padding: '10px 22px',
+                fontSize: 14, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer',
+              }}
+            >
               {saving ? 'Creating…' : 'Create Lead'}
             </button>
             <Link href="/admin/crm" style={{ background: 'none', border: `1px solid ${c.border}`, borderRadius: 8, padding: '10px 18px', fontSize: 14, color: c.muted, textDecoration: 'none' }}>
@@ -336,6 +400,15 @@ export default function NewLeadPage() {
 
         </form>
       </div>
+  );
+}
+
+export default function NewLeadPage() {
+  return (
+    <AdminShell>
+      <Suspense fallback={<div style={{ padding: 32, color: '#5c7090' }}>Loading…</div>}>
+        <NewLeadForm />
+      </Suspense>
     </AdminShell>
   );
 }
