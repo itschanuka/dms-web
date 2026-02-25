@@ -319,3 +319,148 @@ export const adminApi = {
       { method: 'PATCH' }
     ),
 };
+
+// ─────────────────────────────────────────────────────────────
+// CUSTOMER TYPES — Phase 3
+// ─────────────────────────────────────────────────────────────
+
+export type CustomerType   = 'individual' | 'business' | 'dealer_trader' | 'repeat_buyer';
+export type CustomerStatus = 'active' | 'inactive' | 'blacklisted';
+
+export interface Customer {
+  id:               string;
+  customer_code:    string;
+  full_name:        string;
+  phone_primary:    string;
+  phone_secondary:  string | null;
+  email:            string | null;
+  address:          string | null;
+  city:             string | null;
+  nic_passport:     string | null;
+  business_name:    string | null;
+  customer_type:    CustomerType;
+  status:           CustomerStatus;
+  blacklist_reason: string | null;
+  blacklisted_at:   string | null;
+  created_at:       string;
+  updated_at:       string;
+}
+
+export interface CustomerNote {
+  id:         string;
+  note:       string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface CustomerDetail extends Customer {
+  business_reg_no: string | null;
+  blacklisted_by:  string | null;
+  notes: CustomerNote[];
+  leads: Array<{
+    id:                      string;
+    lead_code:               string;
+    status:                  string;
+    source:                  string;
+    interested_vehicle_desc: string | null;
+    created_at:              string;
+  }>;
+  deals: Array<{
+    id:             string;
+    deal_code:      string;
+    status:         string;
+    selling_price:  number;
+    payment_status: string;
+    deal_date:      string;
+  }>;
+  financial_summary: {
+    total_deals:  number;
+    total_spend:  number;
+    active_deals: number;
+  };
+}
+
+export interface DuplicateMatch {
+  id:            string;
+  field:         string;
+  customer_code: string;
+  full_name:     string;
+}
+
+export interface CustomerListParams {
+  page?:          number;
+  limit?:         number;
+  search?:        string;
+  customer_type?: string;
+  city?:          string;
+  status?:        string;
+}
+
+export interface CreateCustomerData {
+  full_name:        string;
+  phone_primary:    string;
+  phone_secondary?: string;
+  email?:           string;
+  address?:         string;
+  city?:            string;
+  nic_passport?:    string;
+  business_name?:   string;
+  business_reg_no?: string;
+  customer_type:    CustomerType;
+}
+
+// ─────────────────────────────────────────────────────────────
+// CUSTOMER API — Phase 3
+// ─────────────────────────────────────────────────────────────
+
+export const customerApi = {
+  list: (params: CustomerListParams = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v));
+    });
+    return adminFetch<{ customers: Customer[]; pagination: Pagination }>(
+      `/customers${qs.toString() ? '?' + qs.toString() : ''}`
+    );
+  },
+
+  get: (id: string) =>
+    adminFetch<CustomerDetail>(`/customers/${id}`),
+
+  checkDuplicate: (phone: string, nic?: string, excludeId?: string) => {
+    const qs = new URLSearchParams({ phone });
+    if (nic)       qs.set('nic', nic);
+    if (excludeId) qs.set('exclude_id', excludeId);
+    return adminFetch<{ duplicates: DuplicateMatch[] }>(`/customers/check-duplicate?${qs.toString()}`);
+  },
+
+  create: (data: CreateCustomerData) =>
+    adminFetch<Customer>('/customers', { method: 'POST', body: JSON.stringify(data) }),
+
+  update: (id: string, data: Partial<CreateCustomerData> & { status?: 'active' | 'inactive' }) =>
+    adminFetch<Customer>(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  blacklist: (id: string, reason: string) =>
+    adminFetch<Customer>(`/customers/${id}/blacklist`, {
+      method: 'PATCH',
+      body:   JSON.stringify({ reason }),
+    }),
+
+  removeBlacklist: (id: string) =>
+    adminFetch<Customer>(`/customers/${id}/remove-blacklist`, { method: 'PATCH' }),
+
+  softDelete: (id: string) =>
+    adminFetch<{ message: string }>(`/customers/${id}`, { method: 'DELETE' }),
+
+  getNotes: (id: string) =>
+    adminFetch<CustomerNote[]>(`/customers/${id}/notes`),
+
+  addNote: (id: string, note: string) =>
+    adminFetch<CustomerNote>(`/customers/${id}/notes`, {
+      method: 'POST',
+      body:   JSON.stringify({ note }),
+    }),
+
+  deleteNote: (customerId: string, noteId: string) =>
+    adminFetch<{ message: string }>(`/customers/${customerId}/notes/${noteId}`, { method: 'DELETE' }),
+};
