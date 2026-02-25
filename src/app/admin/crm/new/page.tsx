@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminShell from '@/components/admin/AdminShell';
@@ -29,7 +29,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-export default function NewLeadPage() {
+function NewLeadForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const { isDark }   = useTheme();
@@ -195,7 +195,6 @@ export default function NewLeadPage() {
   }
 
   return (
-    <AdminShell>
       <div style={{ padding: '28px 32px', maxWidth: 780 }}>
 
         {/* ── Header ── */}
@@ -401,6 +400,15 @@ export default function NewLeadPage() {
 
         </form>
       </div>
+  );
+}
+
+export default function NewLeadPage() {
+  return (
+    <AdminShell>
+      <Suspense fallback={<div style={{ padding: 32, color: '#5c7090' }}>Loading…</div>}>
+        <NewLeadForm />
+      </Suspense>
     </AdminShell>
   );
 }
