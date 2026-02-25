@@ -93,7 +93,6 @@ function StatusBadge({ status }: { status: LeadStatus }) {
 }
 
 // ─── Vehicle Browse Modal ──────────────────────────────────────────────────────
-// Shows ONLY available vehicles — once a vehicle is sold (won), it disappears from here automatically.
 function VehicleBrowseModal({ onPick, onClose, isDark }: {
   onPick:(v:VehicleSearchResult)=>void; onClose:()=>void; isDark:boolean;
 }) {
@@ -107,7 +106,6 @@ function VehicleBrowseModal({ onPick, onClose, isDark }: {
 
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 80);
-    // Only fetch available vehicles — won/sold vehicles won't appear here
     adminApi.listVehicles({ status:'available', limit:100 })
       .then(res => { setVehicles(res.vehicles); setMakes([...new Set(res.vehicles.map(v=>v.make))].sort()); })
       .catch(()=>{})
@@ -239,7 +237,6 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
 
   useEffect(()=>{
     leadApi.getSalespersons().then(setSalespersons).catch(()=>{});
-    // Pre-fill customer from query param (e.g. coming from customers page)
     const preId = new URLSearchParams(window.location.search).get('customer_id');
     if (preId) customerApi.get(preId).then(c=>{
       setSelectedCustomer(c);
@@ -251,14 +248,12 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
     if (employee?.role==='salesperson') setForm(f=>({...f, assigned_to:employee.id}));
   }, [employee]);
 
-  // Close vehicle dropdown on outside click
   useEffect(()=>{
     const fn=(e:MouseEvent)=>{ if(searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) setDropdownOpen(false); };
     document.addEventListener('mousedown', fn);
     return ()=>document.removeEventListener('mousedown', fn);
   }, []);
 
-  // Debounced vehicle search — only searches available vehicles
   useEffect(()=>{
     if (!vehicleQuery || vehicleQuery.length<2) { setVehicleResults([]); setDropdownOpen(false); return; }
     if (vehicleTimer.current) clearTimeout(vehicleTimer.current);
@@ -270,7 +265,6 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
     return ()=>{ if(vehicleTimer.current) clearTimeout(vehicleTimer.current); };
   }, [vehicleQuery]);
 
-  // Debounced customer search
   useEffect(()=>{
     if (!customerQuery || customerQuery.length<2) { setCustomerResults([]); return; }
     if (customerTimer.current) clearTimeout(customerTimer.current);
@@ -310,6 +304,7 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
         next_followup_date:      form.next_followup_date||undefined,
         next_followup_note:      form.next_followup_note||undefined,
       });
+      onCreated(lead.id);
       router.push(`/admin/crm/${lead.id}`);
     } catch(err){ setError(String(err)); setSaving(false); }
   }
@@ -324,7 +319,6 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
         </div>
       )}
 
-      {/* Two-column layout: form fields left, summary right */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 280px', gap:16, alignItems:'start' }}>
 
         {/* ── LEFT: form fields ── */}
@@ -337,7 +331,6 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
               <span style={{ fontSize:12, fontWeight:700, color:t.text }}>Customer</span>
             </div>
             <div style={{ padding:16 }}>
-              {/* Customer search */}
               {!selectedCustomer ? (
                 <div style={{ marginBottom:14 }}>
                   <div style={{ fontSize:11, fontWeight:700, color:t.label, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.05em' }}>Search existing customer — optional</div>
@@ -482,7 +475,6 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
               <span style={{ fontSize:12, fontWeight:700, color:t.text }}>Lead Details</span>
             </div>
             <div style={{ padding:16, display:'flex', flexDirection:'column', gap:14 }}>
-              {/* Source pills */}
               <div>
                 <div style={{ fontSize:11, fontWeight:700, color:t.label, marginBottom:8, textTransform:'uppercase', letterSpacing:'0.05em' }}>Source <span style={{ color:t.danger }}>*</span></div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:7 }}>
@@ -530,7 +522,6 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
               <div style={{ fontSize:11, fontWeight:700, color:t.label, letterSpacing:'0.07em', textTransform:'uppercase' }}>Summary</div>
             </div>
             <div style={{ padding:'14px 16px', display:'flex', flexDirection:'column', gap:12 }}>
-              {/* Customer */}
               <div>
                 <div style={{ fontSize:10, fontWeight:700, color:t.muted, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>Customer</div>
                 {form.customer_name ? (
@@ -546,7 +537,6 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
                 ) : <div style={{ fontSize:11, color:t.muted, fontStyle:'italic' }}>Not set</div>}
               </div>
               <div style={{ height:1, background:t.border }} />
-              {/* Vehicle */}
               <div>
                 <div style={{ fontSize:10, fontWeight:700, color:t.muted, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>Vehicle</div>
                 {selectedVehicle ? (
@@ -564,7 +554,6 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
                 ) : <div style={{ fontSize:11, color:t.muted, fontStyle:'italic' }}>Not specified</div>}
               </div>
               <div style={{ height:1, background:t.border }} />
-              {/* Details */}
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
                   <span style={{ color:t.muted }}>Source</span>
@@ -582,7 +571,6 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
                 )}
               </div>
               <div style={{ height:1, background:t.border }} />
-              {/* Readiness checks */}
               <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
                 {[
                   { ok:!!form.customer_name.trim(),  label:'Customer name'     },
@@ -600,7 +588,6 @@ function AddLeadForm({ isDark, onCreated }: { isDark:boolean; onCreated:(id:stri
                 ))}
               </div>
             </div>
-            {/* Submit */}
             <div style={{ padding:'12px 16px', borderTop:`1px solid ${t.border}`, background:isDark?'rgba(255,255,255,0.015)':'rgba(0,0,0,0.01)' }}>
               <button type="submit" disabled={saving}
                 style={{ width:'100%', background:saving?'#0a4a35':'linear-gradient(135deg,#10b981,#059669)', color:'#fff', border:'none', borderRadius:9,
@@ -752,7 +739,6 @@ function LeadsList({ isDark, refreshKey }: { isDark:boolean; refreshKey:number }
           </div>
         ) : (
           <>
-            {/* Column header */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 110px 100px 120px 110px', padding:'8px 18px', borderBottom:`1px solid ${t.border}`,
               fontSize:10, fontWeight:700, color:t.label, letterSpacing:'0.07em', textTransform:'uppercase',
               background:isDark?'rgba(255,255,255,0.015)':'rgba(0,0,0,0.02)' }}>
@@ -769,7 +755,6 @@ function LeadsList({ isDark, refreshKey }: { isDark:boolean; refreshKey:number }
                     background:t.row, transition:'background 0.12s', alignItems:'center' }}
                   onMouseEnter={e=>(e.currentTarget as HTMLAnchorElement).style.background=t.rowHov}
                   onMouseLeave={e=>(e.currentTarget as HTMLAnchorElement).style.background=t.row}>
-                  {/* Customer */}
                   <div style={{ display:'flex', alignItems:'center', gap:9 }}>
                     <div style={{ width:29, height:29, borderRadius:'50%', background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.25)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#8b5cf6', flexShrink:0 }}>
                       {lead.customer_name.charAt(0).toUpperCase()}
@@ -779,15 +764,11 @@ function LeadsList({ isDark, refreshKey }: { isDark:boolean; refreshKey:number }
                       <div style={{ fontSize:11, color:t.muted }}>{lead.customer_phone}</div>
                     </div>
                   </div>
-                  {/* Vehicle */}
                   <div style={{ fontSize:12, color:t.text, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:8 }}>
                     {lead.interested_vehicle_desc || <span style={{ color:t.muted, fontStyle:'italic' }}>Not specified</span>}
                   </div>
-                  {/* Source */}
                   <div style={{ fontSize:11, color:t.muted }}>{SRC_ICON[lead.source]} {SRC_LABEL[lead.source]??lead.source}</div>
-                  {/* Status */}
                   <div><StatusBadge status={lead.status} /></div>
-                  {/* Follow-up */}
                   <div>
                     {lead.next_followup_date ? (
                       <span style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:600,
@@ -799,7 +780,6 @@ function LeadsList({ isDark, refreshKey }: { isDark:boolean; refreshKey:number }
                       </span>
                     ) : <span style={{ fontSize:11, color:t.muted }}>—</span>}
                   </div>
-                  {/* Assigned */}
                   <div style={{ fontSize:12, color:t.text, fontWeight:500 }}>
                     {sp ? sp.full_name.split(' ')[0] : <span style={{ color:t.muted, fontStyle:'italic' }}>Unassigned</span>}
                   </div>
@@ -835,8 +815,8 @@ function LeadsList({ isDark, refreshKey }: { isDark:boolean; refreshKey:number }
 function CrmPageInner() {
   const { isDark } = useTheme();
   const t = tok(isDark);
-  const [formOpen,    setFormOpen]    = useState(true);
-  const [refreshKey,  setRefreshKey]  = useState(0);
+  const [formOpen,   setFormOpen]   = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   return (
     <div style={{ padding:'24px 28px 56px', background:t.pageBg, minHeight:'100%' }}>
@@ -845,13 +825,20 @@ function CrmPageInner() {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:22 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:900, color:t.text, margin:'0 0 3px', letterSpacing:'-0.4px' }}>CRM Pipeline</h1>
-          <p style={{ fontSize:13, color:t.muted, margin:0 }}>Add new leads and manage your existing pipeline.</p>
+          <p style={{ fontSize:13, color:t.muted, margin:0 }}>Manage your pipeline and add new leads.</p>
         </div>
+        {/* Quick-open button in header when form is collapsed */}
+        {!formOpen && (
+          <button onClick={()=>setFormOpen(true)}
+            style={{ display:'flex', alignItems:'center', gap:7, background:'linear-gradient(135deg,#10b981,#059669)', color:'#fff', border:'none', borderRadius:9,
+              padding:'9px 18px', fontSize:13, fontWeight:800, cursor:'pointer', boxShadow:'0 4px 14px rgba(16,185,129,0.3)' }}>
+            ➕ Add New Lead
+          </button>
+        )}
       </div>
 
-      {/* ── Add New Lead (collapsible) ── */}
+      {/* ── Add New Lead (collapsible, starts closed) ── */}
       <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:14, overflow:'hidden', boxShadow:t.shadow, marginBottom:24 }}>
-        {/* Toggle header */}
         <button
           onClick={()=>setFormOpen(o=>!o)}
           style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 20px', background:'none', border:'none', cursor:'pointer',
@@ -865,8 +852,6 @@ function CrmPageInner() {
           </div>
           <span style={{ fontSize:12, color:t.muted, fontWeight:700, transform:formOpen?'rotate(180deg)':'none', transition:'transform 0.2s', display:'block' }}>▼</span>
         </button>
-
-        {/* Form body */}
         {formOpen && (
           <div style={{ padding:20 }}>
             <AddLeadForm isDark={isDark} onCreated={(id)=>{ setFormOpen(false); setRefreshKey(k=>k+1); }} />
@@ -879,6 +864,7 @@ function CrmPageInner() {
         <div style={{ fontSize:11, fontWeight:700, color:t.label, letterSpacing:'0.07em', textTransform:'uppercase', marginBottom:12 }}>Existing Leads</div>
         <LeadsList isDark={isDark} refreshKey={refreshKey} />
       </div>
+
     </div>
   );
 }
