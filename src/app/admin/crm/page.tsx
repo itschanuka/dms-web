@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import AdminShell from '@/components/admin/AdminShell';
 import { leadApi, type Lead, type Pagination } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
-import { useAuth } from '@/hooks/useAuth';
 
 // ── Constants ──────────────────────────────────────────────────
 
@@ -114,9 +113,8 @@ function OverdueBadge() {
 // ── Main page ──────────────────────────────────────────────────
 
 export default function CrmPage() {
-  const router = useRouter();
+  const router   = useRouter();
   const { isDark } = useTheme();
-  const { employee, isAdmin, isManager } = useAuth();
 
   const [leads,      setLeads]      = useState<Lead[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -294,7 +292,7 @@ export default function CrmPage() {
               </thead>
               <tbody>
                 {leads.map((lead, i) => {
-                  const overdue = isOverdue(lead);
+                  const overdue  = isOverdue(lead);
                   const dueToday = isDueToday(lead);
                   return (
                     <tr
