@@ -18,7 +18,8 @@ export default async function InventoryPage() {
   };
 
   try {
-    filters = await publicApi.getVehicleFilters();
+    const result = await publicApi.getVehicleFilters();
+    if (result.success) filters = result.data;
   } catch {
     // Filters stay empty — client can still search
   }

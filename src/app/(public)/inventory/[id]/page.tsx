@@ -10,7 +10,9 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { id } = await params;
-    const vehicle = await publicApi.getVehicle(id);
+    const result = await publicApi.getVehicle(id);
+    if (!result.success) return { title: 'Vehicle Detail' };
+    const vehicle = result.data;
     return {
       title: `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.variant ? ' ' + vehicle.variant : ''}`,
       description: `${vehicle.condition} ${vehicle.year} ${vehicle.make} ${vehicle.model} — ${vehicle.fuel_type}, ${vehicle.transmission}. Asking price: LKR ${vehicle.asking_price.toLocaleString()}.`,
@@ -23,8 +25,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function VehicleDetailPage({ params }: Props) {
   try {
     const { id } = await params;
-    const vehicle = await publicApi.getVehicle(id);
-    return <VehicleDetailClient vehicle={vehicle} />;
+    const result = await publicApi.getVehicle(id);
+    if (!result.success) notFound();
+    return <VehicleDetailClient vehicle={result.data} />;
   } catch {
     notFound();
   }
