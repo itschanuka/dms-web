@@ -1183,3 +1183,74 @@ export const reportApi = {
   getSalesReport: (name: string, params: Record<string, string> = {}): Promise<ReportPayload> =>
     adminFetch(`/reports/${name}?` + new URLSearchParams(params).toString()),
 };
+
+// ─────────────────────────────────────────────────────────────
+//  PHASE 10 — TRASH
+// ─────────────────────────────────────────────────────────────
+
+export interface TrashRecord {
+  id:         string;
+  deleted_at: string;
+  deleted_by: string | null;
+  [key: string]: any;
+}
+
+export const trashApi = {
+  list: (type?: string): Promise<Record<string, TrashRecord[]>> => {
+    const qs = type ? `?type=${type}` : '';
+    return adminFetch(`/trash${qs}`);
+  },
+
+  restore: (type: string, id: string): Promise<{ message: string }> =>
+    adminFetch(`/trash/${type}/${id}/restore`, { method: 'PATCH' }),
+
+  permanentDelete: (type: string, id: string): Promise<{ message: string }> =>
+    adminFetch(`/trash/${type}/${id}`, { method: 'DELETE' }),
+};
+
+// ─────────────────────────────────────────────────────────────
+//  PHASE 12 — AUDIT LOGS
+// ─────────────────────────────────────────────────────────────
+
+export interface AuditLog {
+  id:          string;
+  timestamp:   string;
+  actor_type:  string;
+  actor_id:    string | null;
+  actor_name:  string | null;
+  module:      string;
+  action:      string;
+  entity_type: string | null;
+  entity_id:   string | null;
+  message:     string;
+  metadata:    Record<string, unknown> | null;
+  ip_address:  string | null;
+  prev_hash:   string | null;
+  row_hash:    string | null;
+}
+
+export interface AuditListParams {
+  page?:        number;
+  limit?:       number;
+  module?:      string;
+  action?:      string;
+  actor_id?:    string;
+  entity_type?: string;
+  from?:        string;
+  to?:          string;
+  search?:      string;
+}
+
+export const auditApi = {
+  list: (params: AuditListParams = {}): Promise<{ logs: AuditLog[]; pagination: { page: number; limit: number; total: number; pages: number } }> => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') qs.set(k, String(v)); });
+    return adminFetch(`/audit-logs?${qs.toString()}`);
+  },
+
+  verify: (): Promise<{ valid: boolean; firstBrokenAt?: string }> =>
+    adminFetch('/audit-logs/verify'),
+
+  stats: (): Promise<{ byModule: { module: string; count: number }[]; recentActions: AuditLog[] }> =>
+    adminFetch('/audit-logs/stats'),
+};
