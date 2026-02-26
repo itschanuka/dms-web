@@ -897,3 +897,204 @@ export const dealApi = {
       `/deals/helpers/customers/search?q=${encodeURIComponent(q)}`
     ),
 };
+
+// ─────────────────────────────────────────────────────────────
+// COMMISSION API — Phase 6
+// Append these to src/lib/api.ts
+// ─────────────────────────────────────────────────────────────
+
+export interface Commission {
+  id:                     string;
+  deal_id:                string;
+  commission_type:        string;
+  commission_rate:        number | null;
+  fixed_value:            number | null;
+  base_amount:            number | null;
+  calculated_amount:      number;
+  manual_override_amount: number | null;
+  final_amount:           number;
+  status:                 'paid' | 'unpaid';
+  paid_at:                string | null;
+  notes:                  string | null;
+  created_at:             string;
+  employee:               { id: string; full_name: string; employee_code: string; role: string } | null;
+  deal: {
+    deal_code: string;
+    deal_date: string;
+    vehicle: { make: string; model: string; year: number; stock_id: string } | null;
+  } | null;
+  override_by_emp: { full_name: string } | null;
+  paid_by_emp:     { full_name: string } | null;
+}
+
+export interface CommissionStats {
+  total_count:   number;
+  unpaid_count:  number;
+  paid_count:    number;
+  total_amount:  number;
+  unpaid_amount: number;
+  paid_amount:   number;
+}
+
+export interface CommissionSummary {
+  employee_id:   string;
+  month:         string | null;
+  deal_count:    number;
+  total_earned:  number;
+  total_paid:    number;
+  total_unpaid:  number;
+}
+
+export interface CommissionListParams {
+  page?:         number;
+  limit?:        number;
+  employee_id?:  string;
+  status?:       'paid' | 'unpaid';
+  month?:        string;
+  date_from?:    string;
+  date_to?:      string;
+}
+
+export const commissionApi = {
+  getStats: () =>
+    adminFetch<CommissionStats>('/commissions/stats'),
+
+  list: (params: CommissionListParams = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v));
+    });
+    return adminFetch<{ commissions: Commission[]; pagination: Pagination }>(
+      `/commissions${qs.toString() ? '?' + qs.toString() : ''}`
+    );
+  },
+
+  get: (id: string) =>
+    adminFetch<Commission>(`/commissions/${id}`),
+
+  markPaid: (id: string) =>
+    adminFetch<Commission>(`/commissions/${id}/mark-paid`, { method: 'PATCH' }),
+
+  override: (id: string, overrideAmount: number, notes?: string) =>
+    adminFetch<Commission>(`/commissions/${id}/override`, {
+      method: 'PATCH',
+      body: JSON.stringify({ override_amount: overrideAmount, notes }),
+    }),
+
+  getEmployeeSummary: (employeeId: string, month?: string) => {
+    const qs = month ? `?month=${month}` : '';
+    return adminFetch<CommissionSummary>(`/commissions/employee/${employeeId}/summary${qs}`);
+  },
+};
+
+// ─────────────────────────────────────────────────────────────
+// EMPLOYEE API — Phase 7
+// ─────────────────────────────────────────────────────────────
+
+export interface Employee {
+  id:               string;
+  employee_code:    string;
+  full_name:        string;
+  email:            string;
+  phone:            string | null;
+  address:          string | null;
+  nic:              string | null;
+  role:             'admin' | 'manager' | 'salesperson' | 'accountant';
+  status:           'active' | 'inactive';
+  commission_type:  string | null;
+  commission_value: number | null;
+  join_date:        string;
+  last_login_at:    string | null;
+  totp_enabled:     boolean;
+  must_change_password: boolean;
+  created_at:       string;
+}
+
+export interface EmployeeWithPermissions extends Employee {
+  employee_permissions: {
+    view_profit:        boolean;
+    edit_price:         boolean;
+    delete_records:     boolean;
+    view_reports:       boolean;
+    manage_employees:   boolean;
+    audit_view:         boolean;
+    backup_download:    boolean;
+    approve_discount:   boolean;
+    cancel_deal:        boolean;
+    blacklist_customer: boolean;
+    export_reports:     boolean;
+    updated_at:         string;
+  } | null;
+}
+
+export interface EmployeePerformance {
+  employee_id:       string;
+  period:            { from: string | null; to: string | null };
+  deals_closed:      number;
+  deals_total:       number;
+  total_revenue:     number;
+  leads_assigned:    number;
+  leads_won:         number;
+  conversion_rate:   number;
+  commission_earned: number;
+  commission_paid:   number;
+}
+
+export interface CreateEmployeeData {
+  full_name:        string;
+  email:            string;
+  phone?:           string;
+  address?:         string;
+  nic?:             string;
+  join_date:        string;
+  role:             'admin' | 'manager' | 'salesperson' | 'accountant';
+  commission_type?: 'fixed' | 'percent_price' | 'percent_profit' | null;
+  commission_value?: number | null;
+  temp_password:    string;
+}
+
+export const employeeApi = {
+  list: (params: { page?: number; limit?: number; role?: string; status?: string; search?: string } = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v));
+    });
+    return adminFetch<{ employees: Employee[]; pagination: Pagination }>(
+      `/employees${qs.toString() ? '?' + qs.toString() : ''}`
+    );
+  },
+
+  get: (id: string) =>
+    adminFetch<EmployeeWithPermissions>(`/employees/${id}`),
+
+  create: (data: CreateEmployeeData) =>
+    adminFetch<Employee>('/employees', { method: 'POST', body: JSON.stringify(data) }),
+
+  update: (id: string, data: Partial<CreateEmployeeData>) =>
+    adminFetch<Employee>(`/employees/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  updatePermissions: (id: string, perms: Record<string, boolean>) =>
+    adminFetch<unknown>(`/employees/${id}/permissions`, { method: 'PUT', body: JSON.stringify(perms) }),
+
+  updateCommission: (id: string, data: { commission_type: string | null; commission_value: number | null }) =>
+    adminFetch<Employee>(`/employees/${id}/commission`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  updateStatus: (id: string, status: 'active' | 'inactive') =>
+    adminFetch<Employee>(`/employees/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+
+  resetAuth: (id: string, tempPassword: string) =>
+    adminFetch<{ success: boolean }>(`/employees/${id}/reset-auth`, {
+      method: 'POST',
+      body: JSON.stringify({ temp_password: tempPassword }),
+    }),
+
+  getPerformance: (id: string, from?: string, to?: string) => {
+    const qs = new URLSearchParams();
+    if (from) qs.set('from', from);
+    if (to)   qs.set('to', to);
+    return adminFetch<EmployeePerformance>(`/employees/${id}/performance${qs.toString() ? '?' + qs.toString() : ''}`);
+  },
+
+  softDelete: (id: string) =>
+    adminFetch<unknown>(`/employees/${id}`, { method: 'DELETE' }),
+};
