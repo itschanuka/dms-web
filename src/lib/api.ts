@@ -132,17 +132,17 @@ export interface VehicleDocument {
 // FETCH HELPERS
 // ─────────────────────────────────────────────────────────────
 
-async function publicFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+async function publicFetch<T>(path: string, options?: RequestInit): Promise<{ success: true; data: T } | { success: false; error: { message: string } }> {
+  const res  = await fetch(`${API_URL}${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
   const json = await res.json() as { success: boolean; data?: T; error?: { message: string } };
-  if (!json.success) throw new Error(json.error?.message ?? 'API error');
-  return json.data as T;
+  if (!json.success) return { success: false, error: { message: json.error?.message ?? 'API error' } };
+  return { success: true, data: json.data as T };
 }
 
-async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
+async function adminFetch<T>(path: string, options?: RequestInit): Promise<{ success: true; data: T } | { success: false; error: { code: string; message: string } }> {
   const supabase = createClient();
   const { data } = await supabase.auth.getSession();
   const token    = data.session?.access_token;
@@ -160,8 +160,8 @@ async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
     data?:   T;
     error?:  { code: string; message: string };
   };
-  if (!json.success) throw new Error(json.error?.message ?? `Request failed: ${res.status}`);
-  return json.data as T;
+  if (!json.success) return { success: false, error: { code: json.error?.code ?? 'ERROR', message: json.error?.message ?? `Request failed: ${res.status}` } };
+  return { success: true, data: json.data as T };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -221,8 +221,6 @@ export interface AdminVehicleListParams {
 }
 
 export const adminApi = {
-  // ── Inventory ─────────────────────────────────────────────
-
   listVehicles: (params: AdminVehicleListParams = {}) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
@@ -257,8 +255,6 @@ export const adminApi = {
   deleteVehicle: (id: string) =>
     adminFetch<{ message: string }>(`/inventory/${id}`, { method: 'DELETE' }),
 
-  // ── Analytics ─────────────────────────────────────────────
-
   getAnalytics: (from: string, to: string) => {
     const qs = new URLSearchParams({ from, to });
     return adminFetch<{
@@ -279,8 +275,6 @@ export const adminApi = {
     }>(`/inventory/analytics?${qs.toString()}`);
   },
 
-  // ── Costs ─────────────────────────────────────────────────
-
   getCosts: (vehicleId: string) =>
     adminFetch<VehicleCost[]>(`/inventory/${vehicleId}/costs`),
 
@@ -295,8 +289,6 @@ export const adminApi = {
       method: 'PUT',
       body:   JSON.stringify(data),
     }),
-
-  // ── Documents ─────────────────────────────────────────────
 
   getDocuments: (vehicleId: string) =>
     adminFetch<VehicleDocument[]>(`/inventory/${vehicleId}/documents`),
@@ -635,4 +627,267 @@ export const leadApi = {
       method: 'POST',
       body:   JSON.stringify(data),
     }),
+};
+
+// ─────────────────────────────────────────────────────────────
+// DEALS TYPES — Phase 5
+// ─────────────────────────────────────────────────────────────
+
+export type DealStatus    = 'draft' | 'reserved' | 'active' | 'completed' | 'cancelled';
+export type PaymentType   = 'cash' | 'finance' | 'mixed';
+export type PaymentStatus = 'unpaid' | 'partially_paid' | 'fully_paid';
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'cheque' | 'finance_disbursement';
+export type LoanStatus    = 'not_started' | 'submitted' | 'approved' | 'rejected' | 'disbursed';
+
+export interface Deal {
+  id:                 string;
+  deal_code:          string;
+  vehicle_id:         string;
+  customer_id:        string;
+  salesperson_id:     string;
+  deal_date:          string;
+  status:             DealStatus;
+  selling_price:      number;
+  discount_amount:    number;
+  payment_type:       PaymentType;
+  total_paid_cache:   number;
+  payment_status:     PaymentStatus;
+  reservation_amount: number | null;
+  reservation_date:   string | null;
+  reservation_expiry: string | null;
+  notes:              string | null;
+  created_at:         string;
+  updated_at:         string;
+  completed_at:       string | null;
+  customer:    { id: string; customer_code: string; full_name: string; phone_primary: string } | null;
+  vehicle:     { id: string; stock_id: string; make: string; model: string; year: number; main_image_url: string | null } | null;
+  salesperson: { id: string; full_name: string; employee_code: string } | null;
+}
+
+export interface DealPayment {
+  id:                      string;
+  deal_id:                 string;
+  payment_date:            string;
+  amount:                  number;
+  method:                  PaymentMethod;
+  reference_number:        string | null;
+  notes:                   string | null;
+  is_finance_disbursement: boolean;
+  created_at:              string;
+  created_by_emp:          { id: string; full_name: string } | null;
+}
+
+export interface DealFinance {
+  id:                    string;
+  deal_id:               string;
+  provider_type:         'bank' | 'finance_company';
+  provider_name:         string;
+  branch:                string | null;
+  officer_name:          string | null;
+  officer_contact:       string | null;
+  application_date:      string | null;
+  loan_status:           LoanStatus;
+  selling_price_ref:     number;
+  customer_down_payment: number;
+  loan_amount_requested: number | null;
+  loan_amount_approved:  number | null;
+  loan_amount_disbursed: number | null;
+  disbursement_date:     string | null;
+  notes:                 string | null;
+  updated_at:            string;
+}
+
+export interface DealTradeIn {
+  id:                    string;
+  deal_id:               string;
+  make:                  string;
+  model:                 string;
+  year:                  number | null;
+  mileage:               number | null;
+  registration_number:   string | null;
+  condition_notes:       string | null;
+  trade_in_value:        number;
+  added_to_inventory_id: string | null;
+  created_at:            string;
+}
+
+export interface DealDelivery {
+  id:                         string;
+  deal_id:                    string;
+  delivery_date:              string | null;
+  delivery_status:            'pending' | 'delivered';
+  check_payment_received:     boolean;
+  check_agreement_signed:     boolean;
+  check_docs_handed_over:     boolean;
+  check_vehicle_handed_over:  boolean;
+  delivery_notes:             string | null;
+  updated_at:                 string;
+}
+
+export interface DealCommission {
+  id:                     string;
+  deal_id:                string;
+  employee_id:            string;
+  commission_type:        string;
+  commission_rate:        number | null;
+  fixed_value:            number | null;
+  calculated_amount:      number;
+  manual_override_amount: number | null;
+  final_amount:           number;
+  status:                 'unpaid' | 'paid';
+  paid_at:                string | null;
+}
+
+export interface DealDetail extends Deal {
+  vehicle: {
+    id: string; stock_id: string; make: string; model: string; variant: string | null;
+    year: number; color: string; mileage: number; asking_price: number;
+    purchase_price: number; total_cost_cache: number; main_image_url: string | null; status: string;
+  } | null;
+  customer: {
+    id: string; customer_code: string; full_name: string; phone_primary: string;
+    email: string | null; address: string | null; city: string | null; status: string;
+  } | null;
+  salesperson: {
+    id: string; full_name: string; employee_code: string; role: string;
+    commission_type: string | null; commission_value: number | null;
+  } | null;
+  discount_approver: { id: string; full_name: string } | null;
+  payments:   DealPayment[];
+  finance:    DealFinance | null;
+  trade_in:   DealTradeIn | null;
+  delivery:   DealDelivery | null;
+  commission: DealCommission | null;
+}
+
+export interface DealProfit {
+  selling_price:     number;
+  discount_amount:   number;
+  effective_price:   number;
+  total_cost:        number;
+  gross_profit:      number;
+  commission_amount: number;
+  net_profit:        number;
+  commission:        DealCommission | null;
+}
+
+export interface DealListParams {
+  page?:           number;
+  limit?:          number;
+  status?:         string;
+  payment_status?: string;
+  salesperson_id?: string;
+  customer_id?:    string;
+  vehicle_id?:     string;
+  date_from?:      string;
+  date_to?:        string;
+  search?:         string;
+}
+
+export interface CreateDealData {
+  vehicle_id:          string;
+  customer_id:         string;
+  salesperson_id:      string;
+  deal_date:           string;
+  selling_price:       number;
+  discount_amount?:    number;
+  payment_type:        PaymentType;
+  reservation_amount?: number;
+  reservation_date?:   string;
+  reservation_expiry?: string;
+  notes?:              string;
+  lead_id?:            string;
+}
+
+// ─────────────────────────────────────────────────────────────
+// DEALS API — Phase 5
+// ─────────────────────────────────────────────────────────────
+
+export const dealApi = {
+  list: (params: DealListParams = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '' && v !== false) qs.set(k, String(v));
+    });
+    return adminFetch<{ deals: Deal[]; pagination: Pagination }>(
+      `/deals${qs.toString() ? '?' + qs.toString() : ''}`
+    );
+  },
+
+  get:    (id: string) => adminFetch<DealDetail>(`/deals/${id}`),
+
+  create: (data: CreateDealData) =>
+    adminFetch<Deal>('/deals', { method: 'POST', body: JSON.stringify(data) }),
+
+  update: (id: string, data: Partial<CreateDealData>) =>
+    adminFetch<Deal>(`/deals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  complete: (id: string, override_payment = false) =>
+    adminFetch<{ success: boolean; deal_code: string }>(`/deals/${id}/complete`, {
+      method: 'PATCH', body: JSON.stringify({ override_payment }),
+    }),
+
+  cancel: (id: string, reason: string, refund_amount?: number) =>
+    adminFetch<{ success: boolean }>(`/deals/${id}/cancel`, {
+      method: 'PATCH', body: JSON.stringify({ reason, refund_amount }),
+    }),
+
+  applyDiscount: (id: string, discount_amount: number) =>
+    adminFetch<Deal>(`/deals/${id}/discount`, {
+      method: 'PATCH', body: JSON.stringify({ discount_amount }),
+    }),
+
+  softDelete: (id: string) =>
+    adminFetch<{ message: string }>(`/deals/${id}`, { method: 'DELETE' }),
+
+  getPayments: (id: string) =>
+    adminFetch<DealPayment[]>(`/deals/${id}/payments`),
+
+  addPayment: (id: string, data: { payment_date: string; amount: number; method: PaymentMethod; reference_number?: string; notes?: string }) =>
+    adminFetch<DealPayment>(`/deals/${id}/payments`, {
+      method: 'POST', body: JSON.stringify(data),
+    }),
+
+  getFinance: (id: string) =>
+    adminFetch<DealFinance | null>(`/deals/${id}/finance`),
+
+  upsertFinance: (id: string, data: Partial<DealFinance>) =>
+    adminFetch<DealFinance>(`/deals/${id}/finance`, {
+      method: 'PUT', body: JSON.stringify(data),
+    }),
+
+  disburse: (id: string, data: { loan_amount_disbursed: number; disbursement_date: string; reference_number?: string }) =>
+    adminFetch<DealPayment>(`/deals/${id}/finance/disburse`, {
+      method: 'PATCH', body: JSON.stringify(data),
+    }),
+
+  getTradeIn: (id: string) =>
+    adminFetch<DealTradeIn | null>(`/deals/${id}/trade-in`),
+
+  upsertTradeIn: (id: string, data: Partial<DealTradeIn>) =>
+    adminFetch<DealTradeIn>(`/deals/${id}/trade-in`, {
+      method: 'PUT', body: JSON.stringify(data),
+    }),
+
+  getDelivery: (id: string) =>
+    adminFetch<DealDelivery | null>(`/deals/${id}/delivery`),
+
+  updateDelivery: (id: string, data: Partial<DealDelivery>) =>
+    adminFetch<DealDelivery>(`/deals/${id}/delivery`, {
+      method: 'PATCH', body: JSON.stringify(data),
+    }),
+
+  getProfit: (id: string) =>
+    adminFetch<DealProfit>(`/deals/${id}/profit`),
+
+  getSalespersons: () =>
+    adminFetch<Salesperson[]>('/deals/helpers/salespersons'),
+
+  searchVehicles: (q: string) =>
+    adminFetch<VehicleSearchResult[]>(`/deals/helpers/vehicles/search?q=${encodeURIComponent(q)}`),
+
+  searchCustomers: (q: string) =>
+    adminFetch<{ id: string; customer_code: string; full_name: string; phone_primary: string; status: string }[]>(
+      `/deals/helpers/customers/search?q=${encodeURIComponent(q)}`
+    ),
 };
