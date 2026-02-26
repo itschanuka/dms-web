@@ -64,7 +64,7 @@ export default function NewDealPage() {
   const cTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    dealApi.getSalespersons().then(r => { if (r.success) setSalespersons(r.data); });
+    dealApi.getSalespersons().then(setSalespersons).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export default function NewDealPage() {
     if (vTimer.current) clearTimeout(vTimer.current);
     vTimer.current = setTimeout(async () => {
       const r = await dealApi.searchVehicles(vehicleSearch);
-      if (r.success) { setVehicleResults(r.data); setVehicleOpen(true); }
+      setVehicleResults(r); setVehicleOpen(true);
     }, 300);
   }, [vehicleSearch]);
 
@@ -81,7 +81,7 @@ export default function NewDealPage() {
     if (cTimer.current) clearTimeout(cTimer.current);
     cTimer.current = setTimeout(async () => {
       const r = await dealApi.searchCustomers(customerSearch);
-      if (r.success) { setCustomerResults(r.data); setCustomerOpen(true); }
+      setCustomerResults(r); setCustomerOpen(true);
     }, 300);
   }, [customerSearch]);
 
@@ -117,11 +117,7 @@ export default function NewDealPage() {
         reservation_expiry: reservationExp  || undefined,
         notes: notes || undefined,
       });
-      if (res.success) {
-        router.push(`/admin/deals/${res.data.id}`);
-      } else {
-        setError((res as { error?: { message?: string } }).error?.message ?? 'Failed to create deal');
-      }
+      router.push(`/admin/deals/${res.id}`);
     } catch (e) {
       setError(String(e));
     } finally {

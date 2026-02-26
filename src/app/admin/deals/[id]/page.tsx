@@ -141,9 +141,8 @@ export default function DealDetailPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await dealApi.get(dealId);
-      if (res.success) {
-        const d = res.data;
+      const d = await dealApi.get(dealId);
+      {
         setDeal(d);
         if (d.finance) {
           setFinProvType(d.finance.provider_type);
@@ -189,7 +188,7 @@ export default function DealDetailPage() {
 
   useEffect(() => {
     if (tab === 'profit' && !profit && employee?.permissions?.view_profit) {
-      dealApi.getProfit(dealId).then(r => { if (r.success) setProfit(r.data); });
+      dealApi.getProfit(dealId).then(setProfit).catch(() => {});
     }
   }, [tab, profit, dealId, employee]);
 
@@ -204,8 +203,7 @@ export default function DealDetailPage() {
     if (!pmtAmt || !pmtDate) return;
     setSaving(true);
     const r = await dealApi.addPayment(dealId, { payment_date: pmtDate, amount: parseFloat(pmtAmt), method: pmtMeth, reference_number: pmtRef || undefined });
-    if (r.success) { flash('Payment added ✓'); setPmtAmt(''); setPmtRef(''); await load(); }
-    else flash('Failed to add payment', true);
+    flash('Payment added ✓'); setPmtAmt(''); setPmtRef(''); await load();
     setSaving(false);
   };
 
@@ -222,8 +220,7 @@ export default function DealDetailPage() {
       loan_amount_approved:  finApproved  ? parseFloat(finApproved)  : undefined,
       notes: finNotes || undefined,
     });
-    if (r.success) { flash('Finance saved ✓'); await load(); }
-    else flash('Failed to save finance', true);
+    flash('Finance saved ✓'); await load();
     setSaving(false);
   };
 
@@ -231,8 +228,7 @@ export default function DealDetailPage() {
     if (!disbAmt || !disbDate) return;
     setSaving(true);
     const r = await dealApi.disburse(dealId, { loan_amount_disbursed: parseFloat(disbAmt), disbursement_date: disbDate, reference_number: disbRef || undefined });
-    if (r.success) { flash('Disbursement recorded ✓'); setDisbAmt(''); setDisbRef(''); await load(); }
-    else flash('Failed to record disbursement', true);
+    flash('Disbursement recorded ✓'); setDisbAmt(''); setDisbRef(''); await load();
     setSaving(false);
   };
 
@@ -247,8 +243,7 @@ export default function DealDetailPage() {
       condition_notes:     tiNotes || undefined,
       trade_in_value: parseFloat(tiValue),
     });
-    if (r.success) { flash('Trade-in saved ✓'); await load(); }
-    else flash('Failed to save trade-in', true);
+    flash('Trade-in saved ✓'); await load();
     setSaving(false);
   };
 
@@ -263,16 +258,14 @@ export default function DealDetailPage() {
       check_vehicle_handed_over: delVehicle,
       delivery_notes:            delNotes  || undefined,
     } as Partial<DealDelivery>);
-    if (r.success) { flash('Delivery updated ✓'); await load(); }
-    else flash('Failed to update delivery', true);
+    flash('Delivery updated ✓'); await load();
     setSaving(false);
   };
 
   const handleComplete = async () => {
     setSaving(true);
     const r = await dealApi.complete(dealId, overridePay);
-    if (r.success) { flash('Deal completed ✓'); setShowComplete(false); await load(); }
-    else flash((r as { error?: { message?: string } }).error?.message ?? 'Failed to complete', true);
+    flash('Deal completed ✓'); setShowComplete(false); await load();
     setSaving(false);
   };
 
@@ -280,8 +273,7 @@ export default function DealDetailPage() {
     if (!cancelReason) return;
     setSaving(true);
     const r = await dealApi.cancel(dealId, cancelReason, cancelRefund ? parseFloat(cancelRefund) : undefined);
-    if (r.success) { flash('Deal cancelled'); setShowCancel(false); await load(); }
-    else flash('Failed to cancel deal', true);
+    flash('Deal cancelled'); setShowCancel(false); await load();
     setSaving(false);
   };
 

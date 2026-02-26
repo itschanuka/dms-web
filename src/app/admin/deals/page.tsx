@@ -71,11 +71,9 @@ function DealsContent() {
         date_from:      dateFrom  || undefined,
         date_to:        dateTo    || undefined,
       });
-      if (res.success) {
-        setDeals(res.data.deals);
-        setTotal(res.data.pagination.total);
-        setTotalPages(res.data.pagination.totalPages);
-      }
+      setDeals(res.deals);
+      setTotal(res.pagination.total);
+      setTotalPages(res.pagination.totalPages);
     } finally {
       setLoading(false);
     }
@@ -83,7 +81,7 @@ function DealsContent() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    dealApi.getSalespersons().then(r => { if (r.success) setSalespersons(r.data); });
+    dealApi.getSalespersons().then(setSalespersons).catch(() => {});
   }, []);
 
   const clearFilters = () => {

@@ -142,7 +142,7 @@ async function publicFetch<T>(path: string, options?: RequestInit): Promise<{ su
   return { success: true, data: json.data as T };
 }
 
-async function adminFetch<T>(path: string, options?: RequestInit): Promise<{ success: true; data: T } | { success: false; error: { code: string; message: string } }> {
+async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const supabase = createClient();
   const { data } = await supabase.auth.getSession();
   const token    = data.session?.access_token;
@@ -160,8 +160,11 @@ async function adminFetch<T>(path: string, options?: RequestInit): Promise<{ suc
     data?:   T;
     error?:  { code: string; message: string };
   };
-  if (!json.success) return { success: false, error: { code: json.error?.code ?? 'ERROR', message: json.error?.message ?? `Request failed: ${res.status}` } };
-  return { success: true, data: json.data as T };
+  if (!json.success) {
+    const msg = json.error?.message ?? `Request failed: ${res.status}`;
+    throw new Error(msg);
+  }
+  return json.data as T;
 }
 
 // ─────────────────────────────────────────────────────────────

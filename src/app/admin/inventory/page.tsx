@@ -62,7 +62,7 @@ function SparkBars({ data, field, color }: { data: Array<{ month: string; added:
   const max = Math.max(...data.map(d => d[field]), 1);
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 36 }}>
-      {data.slice(-12).map(d => {
+      {data.slice(-12).map((d: { month: string; added: number; sold: number }) => {
         const h = Math.max(2, (d[field] / max) * 36);
         return (
           <div key={d.month} title={`${d.month}: ${d[field]}`} style={{
@@ -75,9 +75,23 @@ function SparkBars({ data, field, color }: { data: Array<{ month: string; added:
   );
 }
 
-// ── Analytics panel ────────────────────────────────────────────
-
-type AnalyticsData = Awaited<ReturnType<typeof adminApi.getAnalytics>>;
+// ── Analytics data type (unwrapped success shape) ───────────────
+type AnalyticsData = {
+  period:            { from: string; to: string };
+  totalVehicles:     number;
+  statusCounts:      Record<string, number>;
+  availableCount:    number;
+  inventoryValue:    number;
+  inventoryCostBase: number;
+  inventoryProfit:   number;
+  addedInPeriod:     number;
+  soldInPeriod:      number;
+  revenueInPeriod:   number;
+  costInPeriod:      number;
+  profitInPeriod:    number;
+  agingBreakdown:    { fresh: number; aging: number; old: number; dead_stock: number };
+  monthlyTrend:      Array<{ month: string; added: number; sold: number }>;
+};
 
 const PRESETS = [
   { key: 'today',   label: 'Today'      },
@@ -108,8 +122,8 @@ function AnalyticsPanel({ isDark }: { isDark: boolean }) {
     setError('');
     try {
       const range = getPresetRange(p);
-      const result = await adminApi.getAnalytics(range.from, range.to);
-      setData(result);
+      const data  = await adminApi.getAnalytics(range.from, range.to);
+      setData(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load analytics');
     } finally {
@@ -177,10 +191,10 @@ function AnalyticsPanel({ isDark }: { isDark: boolean }) {
               {/* ── Row 1: Period KPIs ── */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 16 }}>
                 {[
-                  { label: 'Added This Period',  value: data.addedInPeriod,                         color: '#818cf8', fmt: (n: number) => String(n) },
-                  { label: 'Sold This Period',   value: data.soldInPeriod,                           color: '#10b981', fmt: (n: number) => String(n) },
-                  { label: 'Revenue This Period',value: data.revenueInPeriod,                        color: '#34d399', fmt: formatPrice },
-                  { label: 'Profit This Period', value: data.profitInPeriod,                         color: data.profitInPeriod >= 0 ? '#10b981' : '#ef4444', fmt: formatPrice },
+                  { label: 'Added This Period',   value: data.addedInPeriod,   color: '#818cf8', fmt: (n: number) => String(n) },
+                  { label: 'Sold This Period',    value: data.soldInPeriod,    color: '#10b981', fmt: (n: number) => String(n) },
+                  { label: 'Revenue This Period', value: data.revenueInPeriod, color: '#34d399', fmt: formatPrice },
+                  { label: 'Profit This Period',  value: data.profitInPeriod,  color: data.profitInPeriod >= 0 ? '#10b981' : '#ef4444', fmt: formatPrice },
                 ].map(kpi => (
                   <div key={kpi.label} style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '13px 15px' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: c.sub, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>
@@ -271,7 +285,7 @@ function AnalyticsPanel({ isDark }: { isDark: boolean }) {
                   </div>
                   {/* Month labels */}
                   <div style={{ display: 'flex', gap: 2, marginTop: 4 }}>
-                    {data.monthlyTrend.slice(-12).map(d => (
+                    {data.monthlyTrend.slice(-12).map((d: { month: string; added: number; sold: number }) => (
                       <div key={d.month} style={{ flex: 1, fontSize: 8, color: c.muted, textAlign: 'center' }}>
                         {d.month.slice(5)}
                       </div>
