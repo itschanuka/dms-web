@@ -6,6 +6,9 @@ export function formatPrice(amount: number): string {
   return `LKR ${amount.toLocaleString('en-LK')}`;
 }
 
+/** Alias for formatPrice — use either name */
+export const formatCurrency = formatPrice;
+
 /**
  * Format mileage with unit
  * e.g. 42000 → "42,000 km"
