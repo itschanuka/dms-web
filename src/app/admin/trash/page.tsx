@@ -1,281 +1,289 @@
 'use client';
-
-import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect, useCallback } from 'react';
+import AdminShell from '@/components/admin/AdminShell';
+import { trashApi, type TrashRecord } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useAuth } from '@/hooks/useAuth';
 
-interface NavModule {
-  href:   string;
-  icon:   string;
-  label:  string;
-  color:  string;
-  badge?: string;
-  group?: 'core' | 'system';
+// ── Helpers ──────────────────────────────────────────────────────
+function formatDateTime(ts: string) {
+  return new Date(ts).toLocaleString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
-const MODULES: NavModule[] = [
-  // Core
-  { href: '/admin',             icon: '⬡',  label: 'Dashboard',   color: '#6366f1', group: 'core' },
-  { href: '/admin/inventory',   icon: '🚗', label: 'Inventory',   color: '#0ea5e9', group: 'core' },
-  { href: '/admin/crm',         icon: '📋', label: 'CRM',         color: '#10b981', group: 'core' },
-  { href: '/admin/deals',       icon: '🤝', label: 'Deals',       color: '#f59e0b', group: 'core' },
-  { href: '/admin/customers',   icon: '👤', label: 'Customers',   color: '#8b5cf6', group: 'core' },
-  { href: '/admin/commissions', icon: '💰', label: 'Commissions', color: '#f97316', group: 'core' },
-  { href: '/admin/expenses',    icon: '💳', label: 'Expenses',    color: '#ef4444', group: 'core' },
-  { href: '/admin/employees',   icon: '👥', label: 'Employees',   color: '#ec4899', group: 'core' },
-  { href: '/admin/reports',     icon: '📈', label: 'Reports',     color: '#14b8a6', group: 'core' },
-  // System
-  { href: '/admin/trash',       icon: '🗑️', label: 'Trash',       color: '#64748b', group: 'system' },
-  { href: '/admin/audit',       icon: '🔐', label: 'Audit Log',   color: '#a855f7', group: 'system' },
-];
-
-const BREADCRUMB_MAP: Record<string, string> = {
-  new:         'Add New',
-  edit:        'Edit',
-  detail:      'Detail',
-  commissions: 'Commissions',
-  sales:       'Sales',
-  inventory:   'Inventory',
-  customers:   'Customers',
-  employees:   'Employees',
-  expenses:    'Expenses',
-  crm:         'CRM',
+const TABLE_CONFIG: Record<string, { label: string; icon: string; color: string; nameField: string }> = {
+  vehicles:  { label: 'Vehicles',  icon: '🚗', color: '#0ea5e9', nameField: 'stock_id' },
+  customers: { label: 'Customers', icon: '👤', color: '#8b5cf6', nameField: 'full_name' },
+  leads:     { label: 'Leads',     icon: '📋', color: '#10b981', nameField: 'customer_name' },
+  deals:     { label: 'Deals',     icon: '🤝', color: '#f59e0b', nameField: 'deal_code' },
+  expenses:  { label: 'Expenses',  icon: '💳', color: '#ef4444', nameField: 'description' },
 };
 
-interface Props {
-  children:    React.ReactNode;
-  activeKey?:  string;
-  activePage?: string;  // legacy alias
+const TABS = ['all', 'vehicles', 'customers', 'leads', 'deals', 'expenses'] as const;
+type Tab = typeof TABS[number];
+
+function getRecordName(type: string, record: TrashRecord): string {
+  const field = TABLE_CONFIG[type]?.nameField ?? 'id';
+  return record[field] ?? record.id?.slice(0, 8) ?? '—';
 }
 
-export default function AdminShell({ children }: Props) {
-  const pathname  = usePathname();
-  const router    = useRouter();
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const { toggleTheme, isDark } = useTheme();
+function getRecordSubtitle(type: string, record: TrashRecord): string {
+  if (type === 'vehicles') return `${record.year ?? ''} ${record.make ?? ''} ${record.model ?? ''}`.trim();
+  if (type === 'customers') return record.phone_primary ?? '';
+  if (type === 'leads') return `${record.source ?? ''} · ${record.status ?? ''}`;
+  if (type === 'deals') return `${record.selling_price ? `LKR ${Number(record.selling_price).toLocaleString()}` : ''}`;
+  if (type === 'expenses') return `${record.category ?? ''} · ${record.amount ? `LKR ${Number(record.amount).toLocaleString()}` : ''}`;
+  return '';
+}
 
-  const [userEmail,   setUserEmail]   = useState('');
-  const [userName,    setUserName]    = useState('');
-  const [userRole,    setUserRole]    = useState('');
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [scrolled,    setScrolled]    = useState(false);
+// ── Main Page ─────────────────────────────────────────────────────
+export default function TrashPage() {
+  const { isDark } = useTheme();
+  const { can, isAdmin, isLoading: authLoading } = useAuth();
 
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? ''));
-    const n = sessionStorage.getItem('dms_employee_name');
-    const r = sessionStorage.getItem('dms_employee_role');
-    if (n) setUserName(n);
-    if (r) setUserRole(r);
-  }, []);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const h = () => setScrolled(el.scrollTop > 4);
-    el.addEventListener('scroll', h, { passive: true });
-    return () => el.removeEventListener('scroll', h);
-  }, []);
-
-  async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    sessionStorage.clear();
-    router.push('/admin/login');
-  }
-
-  function isActive(mod: NavModule) {
-    if (mod.href === '/admin') return pathname === '/admin' || pathname === '/admin/dashboard';
-    return pathname.startsWith(mod.href);
-  }
-
-  const activeModule = MODULES.find(m => isActive(m)) ?? MODULES[0]!;
-  const displayName  = userName || userEmail.split('@')[0] || 'User';
-  const initials     = displayName.slice(0, 2).toUpperCase();
-
-  const coreModules   = MODULES.filter(m => m.group === 'core');
-  const systemModules = MODULES.filter(m => m.group === 'system');
+  const [data,    setData]    = useState<Record<string, TrashRecord[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
+  const [tab,     setTab]     = useState<Tab>('all');
+  const [acting,  setActing]  = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{ type: string; id: string; name: string } | null>(null);
+  const [toast,   setToast]   = useState('');
 
   // Color tokens
   const c = {
-    bg:          isDark ? '#141c2e' : '#dde6f0',
-    header:      isDark ? '#1c2538' : '#cdd8ea',
-    border:      isDark ? '#263550' : '#aec2d6',
-    breadBg:     isDark ? '#111827' : '#c8d6e8',
-    breadBorder: isDark ? '#1e2d42' : '#adc0d4',
-    dropdownBg:  isDark ? '#1c2538' : '#e4edf8',
-    hoverRow:    isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-    shadow:      isDark ? '0 16px 48px rgba(0,0,0,0.5)' : '0 8px 30px rgba(0,0,0,0.12)',
-    text:        isDark ? '#e8f0fc' : '#0f1e32',
-    textMuted:   isDark ? '#5a7295' : '#4a6278',
-    navText:     isDark ? '#607898' : '#4a6278',
-    navHover:    isDark ? '#c8d8f0' : '#0f1e32',
-    divider:     isDark ? '#1e2d42' : '#b8ccde',
+    bg:     isDark ? '#141c2e' : '#dde6f0',
+    card:   isDark ? '#1c2538' : '#eaf2fb',
+    border: isDark ? '#263550' : '#aec2d6',
+    text:   isDark ? '#e8f0fc' : '#0f1e32',
+    muted:  isDark ? '#5a7295' : '#4a6278',
+    rowHov: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+    danger: '#ef4444',
   };
 
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await trashApi.list();
+      setData(result);
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to load trash');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  }
+
+  async function handleRestore(type: string, id: string, name: string) {
+    setActing(`restore-${id}`);
+    try {
+      await trashApi.restore(type, id);
+      showToast(`✅ "${name}" restored successfully`);
+      fetchData();
+    } catch (e: any) {
+      showToast(`❌ Restore failed: ${e.message}`);
+    } finally {
+      setActing(null);
+    }
+  }
+
+  async function handlePermDelete(type: string, id: string) {
+    setConfirm(null);
+    setActing(`delete-${id}`);
+    try {
+      await trashApi.permanentDelete(type, id);
+      showToast('🗑️ Permanently deleted');
+      fetchData();
+    } catch (e: any) {
+      showToast(`❌ Delete failed: ${e.message}`);
+    } finally {
+      setActing(null);
+    }
+  }
+
+  // Build rows for current tab
+  const rows: { type: string; record: TrashRecord }[] = [];
+  const types = tab === 'all' ? Object.keys(TABLE_CONFIG) : [tab];
+  for (const type of types) {
+    for (const record of data[type] ?? []) {
+      rows.push({ type, record });
+    }
+  }
+  rows.sort((a, b) => new Date(b.record.deleted_at).getTime() - new Date(a.record.deleted_at).getTime());
+
+  // Total count per type
+  const counts = Object.fromEntries(Object.keys(TABLE_CONFIG).map(t => [t, (data[t] ?? []).length]));
+  const totalCount = Object.values(counts).reduce((s, n) => s + n, 0);
+
+  if (authLoading) return <AdminShell><div style={{ padding: 40, textAlign: 'center', color: '#6366f1' }}>Loading…</div></AdminShell>;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: c.bg, fontFamily: "'Geist', 'DM Sans', ui-sans-serif, system-ui, sans-serif", transition: 'background 0.25s' }}>
+    <AdminShell>
+      <div style={{ padding: '24px 28px', maxWidth: 1200, margin: '0 auto' }}>
 
-      {/* ── Top Header ──────────────────────────────────────── */}
-      <header style={{ height: 52, background: c.header, borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', position: 'sticky', top: 0, zIndex: 300, flexShrink: 0, transition: 'background 0.25s, border-color 0.25s' }}>
+        {/* ── Header ───────────────────────────────────────── */}
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: c.text, margin: 0 }}>🗑️ Trash</h1>
+          <p style={{ fontSize: 13, color: c.muted, margin: '4px 0 0' }}>
+            Soft-deleted records · {totalCount} item{totalCount !== 1 ? 's' : ''} awaiting review
+          </p>
+        </div>
 
-        <Link href="/admin" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 30, height: 30, background: 'linear-gradient(135deg, #6366f1, #0ea5e9)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#fff', flexShrink: 0, boxShadow: '0 0 16px rgba(99,102,241,0.35)' }}>A</div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: c.text, lineHeight: 1, letterSpacing: '-0.3px' }}>Auto Prime</div>
-            <div style={{ fontSize: 10, color: c.textMuted, marginTop: 1, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Admin Console</div>
+        {/* ── Tabs ─────────────────────────────────────────── */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: c.card, border: `1px solid ${c.border}`, borderRadius: 10, padding: 4, width: 'fit-content' }}>
+          {TABS.map(t => {
+            const count = t === 'all' ? totalCount : (counts[t] ?? 0);
+            const cfg = t === 'all' ? null : TABLE_CONFIG[t];
+            const active = tab === t;
+            return (
+              <button key={t} onClick={() => setTab(t)} style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '6px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: active ? 700 : 500,
+                background: active ? (isDark ? '#263550' : '#cddaed') : 'transparent',
+                color: active ? (cfg?.color ?? '#6366f1') : c.muted,
+                transition: 'all 0.15s',
+              }}>
+                {cfg?.icon ?? '📦'} {t === 'all' ? 'All' : cfg?.label}
+                {count > 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 800, background: active ? (cfg?.color ?? '#6366f1') + '22' : c.border, color: active ? (cfg?.color ?? '#6366f1') : c.muted, borderRadius: 10, padding: '1px 6px' }}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Error ────────────────────────────────────────── */}
+        {error && (
+          <div style={{ padding: '12px 16px', borderRadius: 10, background: '#ef444422', border: '1px solid #ef444444', color: '#ef4444', fontSize: 13, marginBottom: 16 }}>
+            ⚠️ {error}
           </div>
-        </Link>
+        )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+        {/* ── Empty ────────────────────────────────────────── */}
+        {!loading && rows.length === 0 && (
+          <div style={{ padding: 60, textAlign: 'center', background: c.card, border: `1px solid ${c.border}`, borderRadius: 12 }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>✨</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: c.text }}>Trash is empty</div>
+            <div style={{ fontSize: 13, color: c.muted, marginTop: 6 }}>No soft-deleted records in this category.</div>
+          </div>
+        )}
 
-          {/* Theme toggle */}
-          <button onClick={toggleTheme} title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)', border: `1px solid ${c.border}`, borderRadius: 20, padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: c.textMuted, transition: 'all 0.15s' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#6366f1'; (e.currentTarget as HTMLButtonElement).style.color = '#6366f1'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = c.border; (e.currentTarget as HTMLButtonElement).style.color = c.textMuted; }}
-          >
-            {isDark ? '☀️' : '🌙'}
-          </button>
+        {/* ── Loading ──────────────────────────────────────── */}
+        {loading && (
+          <div style={{ padding: 48, textAlign: 'center', background: c.card, border: `1px solid ${c.border}`, borderRadius: 12, color: c.muted }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
+            Loading trash…
+          </div>
+        )}
 
-          <Link href="/" target="_blank"
-            style={{ fontSize: 11, color: c.textMuted, textDecoration: 'none', padding: '4px 10px', border: `1px solid ${c.border}`, borderRadius: 20, transition: 'all 0.15s' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = c.navHover; (e.currentTarget as HTMLAnchorElement).style.borderColor = '#6366f1'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = c.textMuted; (e.currentTarget as HTMLAnchorElement).style.borderColor = c.border; }}
-          >
-            View Site ↗
-          </Link>
-
-          {/* Avatar */}
-          <button onClick={() => setProfileOpen(o => !o)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: profileOpen ? 'rgba(99,102,241,0.12)' : 'transparent', border: `1px solid ${profileOpen ? 'rgba(99,102,241,0.3)' : c.border}`, borderRadius: 24, padding: '4px 10px 4px 4px', cursor: 'pointer', transition: 'all 0.15s' }}
-          >
-            <div style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg, ${activeModule.color}33, ${activeModule.color}66)`, border: `1.5px solid ${activeModule.color}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: activeModule.color }}>{initials}</div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: c.text, lineHeight: 1 }}>{displayName}</div>
-              {userRole && <div style={{ fontSize: 10, color: c.textMuted, marginTop: 1, textTransform: 'capitalize' }}>{userRole}</div>}
+        {/* ── Records ──────────────────────────────────────── */}
+        {!loading && rows.length > 0 && (
+          <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            {/* Table header */}
+            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 160px 120px', background: isDark ? '#111827' : '#d4e4f4', borderBottom: `1px solid ${c.border}`, padding: '0 16px' }}>
+              {['Type', 'Record', 'Deleted', 'Actions'].map(h => (
+                <div key={h} style={{ padding: '10px 8px', fontSize: 11, fontWeight: 700, color: c.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</div>
+              ))}
             </div>
-            <span style={{ fontSize: 10, color: c.textMuted, marginLeft: 2 }}>▾</span>
-          </button>
 
-          {/* Dropdown */}
-          {profileOpen && (
-            <>
-              <div onClick={() => setProfileOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 400 }} />
-              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: c.dropdownBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 8, minWidth: 190, zIndex: 500, boxShadow: c.shadow }}>
-                <div style={{ padding: '8px 12px 10px', borderBottom: `1px solid ${c.border}`, marginBottom: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: c.text }}>{displayName}</div>
-                  <div style={{ fontSize: 11, color: c.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userEmail}</div>
+            {rows.map(({ type, record }) => {
+              const cfg = TABLE_CONFIG[type]!;
+              const name = getRecordName(type, record);
+              const subtitle = getRecordSubtitle(type, record);
+              const isActingRestore = acting === `restore-${record.id}`;
+              const isActingDelete  = acting === `delete-${record.id}`;
+
+              return (
+                <div key={`${type}-${record.id}`} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 160px 120px', padding: '0 16px', borderBottom: `1px solid ${c.border}`, transition: 'background 0.1s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = c.rowHov}
+                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
+                >
+                  {/* Type */}
+                  <div style={{ padding: '12px 8px', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 10, background: `${cfg.color}22`, color: cfg.color }}>
+                      {cfg.icon} {cfg.label}
+                    </span>
+                  </div>
+
+                  {/* Name */}
+                  <div style={{ padding: '12px 8px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{name}</div>
+                    {subtitle && <div style={{ fontSize: 11, color: c.muted, marginTop: 2 }}>{subtitle}</div>}
+                    <div style={{ fontSize: 10, color: c.muted, marginTop: 2, fontFamily: 'monospace' }}>{record.id}</div>
+                  </div>
+
+                  {/* Deleted at */}
+                  <div style={{ padding: '12px 8px', display: 'flex', alignItems: 'center' }}>
+                    <div style={{ fontSize: 11, color: c.muted }}>
+                      {record.deleted_at ? formatDateTime(record.deleted_at) : '—'}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ padding: '12px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      disabled={!!acting}
+                      onClick={() => handleRestore(type, record.id, name)}
+                      style={{ padding: '5px 10px', borderRadius: 7, border: `1px solid #10b98144`, background: '#10b98122', color: '#10b981', fontSize: 11, fontWeight: 700, cursor: acting ? 'not-allowed' : 'pointer', opacity: acting ? 0.6 : 1, transition: 'all 0.15s' }}
+                    >
+                      {isActingRestore ? '…' : '↩ Restore'}
+                    </button>
+                    {isAdmin && (
+                      <button
+                        disabled={!!acting}
+                        onClick={() => setConfirm({ type, id: record.id, name })}
+                        style={{ padding: '5px 10px', borderRadius: 7, border: `1px solid #ef444444`, background: '#ef444422', color: '#ef4444', fontSize: 11, fontWeight: 700, cursor: acting ? 'not-allowed' : 'pointer', opacity: acting ? 0.6 : 1, transition: 'all 0.15s' }}
+                      >
+                        {isActingDelete ? '…' : '✕ Delete'}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <DDItem href="/admin/change-password" label="Change Password" icon="🔑" c={c} />
-                <DDItem href="/admin/audit"           label="Audit Log"       icon="🔐" c={c} />
-                <DDItem href="/admin/trash"           label="Trash"           icon="🗑️" c={c} />
-                <div style={{ height: 1, background: c.border, margin: '6px 0' }} />
-                <button onClick={handleSignOut} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 7, background: 'none', border: 'none', fontSize: 12, fontWeight: 600, color: '#ef4444', cursor: 'pointer', textAlign: 'left' }}>
-                  🚪 Sign Out
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Confirm Dialog ───────────────────────────────── */}
+        {confirm && (
+          <>
+            <div onClick={() => setConfirm(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 800 }} />
+            <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: c.card, border: `1px solid ${c.border}`, borderRadius: 14, padding: 28, zIndex: 900, minWidth: 360, boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
+              <div style={{ fontSize: 36, textAlign: 'center', marginBottom: 12 }}>⚠️</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: c.text, textAlign: 'center', marginBottom: 8 }}>Permanently Delete?</div>
+              <div style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginBottom: 24 }}>
+                <strong style={{ color: c.text }}>&ldquo;{confirm.name}&rdquo;</strong> will be permanently marked as deleted. This cannot be undone.
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                <button onClick={() => setConfirm(null)} style={{ padding: '8px 20px', borderRadius: 8, border: `1px solid ${c.border}`, background: 'transparent', color: c.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button onClick={() => handlePermDelete(confirm.type, confirm.id)} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  Delete Forever
                 </button>
               </div>
-            </>
-          )}
-        </div>
-      </header>
+            </div>
+          </>
+        )}
 
-      {/* ── Module Nav ──────────────────────────────────────── */}
-      <nav style={{ background: c.header, borderBottom: `1px solid ${c.border}`, position: 'sticky', top: 52, zIndex: 200, flexShrink: 0, boxShadow: scrolled ? (isDark ? '0 4px 24px rgba(0,0,0,0.4)' : '0 2px 12px rgba(0,0,0,0.1)') : 'none', transition: 'box-shadow 0.2s, background 0.25s' }}>
-        <div style={{ display: 'flex', alignItems: 'stretch', overflowX: 'auto', scrollbarWidth: 'none', maxWidth: 1400, margin: '0 auto', padding: '0 12px' }} className="hide-scrollbar">
+        {/* ── Toast ────────────────────────────────────────── */}
+        {toast && (
+          <div style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', background: isDark ? '#1c2538' : '#fff', border: `1px solid ${c.border}`, borderRadius: 10, padding: '12px 20px', fontSize: 13, fontWeight: 600, color: c.text, boxShadow: '0 8px 32px rgba(0,0,0,0.25)', zIndex: 1000, whiteSpace: 'nowrap' }}>
+            {toast}
+          </div>
+        )}
 
-          {/* Core modules */}
-          {coreModules.map(mod => <NavLink key={mod.href} mod={mod} active={isActive(mod)} c={c} />)}
-
-          {/* Divider */}
-          <div style={{ width: 1, background: c.divider, margin: '10px 6px', flexShrink: 0 }} />
-
-          {/* System modules */}
-          {systemModules.map(mod => <NavLink key={mod.href} mod={mod} active={isActive(mod)} c={c} />)}
-
-        </div>
-      </nav>
-
-      {/* ── Content ─────────────────────────────────────────── */}
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-        {/* Breadcrumb */}
-        <div style={{ background: c.breadBg, borderBottom: `1px solid ${c.breadBorder}`, padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 10, transition: 'background 0.25s' }}>
-          <div style={{ width: 3, height: 16, borderRadius: 3, background: activeModule.color, boxShadow: `0 0 8px ${activeModule.color}70`, flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: c.text, fontWeight: 600 }}>{activeModule.label}</span>
-          {getSubPath(pathname, activeModule) && (
-            <>
-              <span style={{ fontSize: 11, color: c.textMuted }}>›</span>
-              <span style={{ fontSize: 12, color: c.textMuted }}>{getSubPath(pathname, activeModule)}</span>
-            </>
-          )}
-        </div>
-        <main>{children}</main>
       </div>
-
-      <style>{`
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
-    </div>
+    </AdminShell>
   );
-}
-
-// ── NavLink sub-component ────────────────────────────────────
-function NavLink({ mod, active, c }: { mod: NavModule; active: boolean; c: { navText: string; navHover: string; hoverRow: string } }) {
-  return (
-    <Link
-      href={mod.href}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px', height: 44,
-        fontSize: 12.5, fontWeight: active ? 700 : 500,
-        color: active ? mod.color : c.navText,
-        textDecoration: 'none',
-        borderBottom: active ? `2px solid ${mod.color}` : '2px solid transparent',
-        background: active ? `${mod.color}0d` : 'transparent',
-        whiteSpace: 'nowrap', transition: 'all 0.15s ease', flexShrink: 0,
-      }}
-      onMouseEnter={e => { if (!active) { const el = e.currentTarget as HTMLAnchorElement; el.style.color = c.navHover; el.style.background = c.hoverRow; } }}
-      onMouseLeave={e => { if (!active) { const el = e.currentTarget as HTMLAnchorElement; el.style.color = c.navText; el.style.background = 'transparent'; } }}
-    >
-      <span style={{ fontSize: active ? 14 : 13, filter: active ? 'none' : 'grayscale(0.5)', transition: 'all 0.15s' }}>{mod.icon}</span>
-      {mod.label}
-      {mod.badge && (
-        <span style={{ fontSize: 9, fontWeight: 800, color: '#fff', background: mod.color, borderRadius: 10, padding: '1px 5px', textTransform: 'uppercase' }}>{mod.badge}</span>
-      )}
-      {active && <span style={{ width: 4, height: 4, borderRadius: '50%', background: mod.color, marginLeft: 1, boxShadow: `0 0 6px ${mod.color}`, flexShrink: 0 }} />}
-    </Link>
-  );
-}
-
-// ── Dropdown item ────────────────────────────────────────────
-function DDItem({ href, label, icon, c }: { href: string; label: string; icon: string; c: { textMuted: string; hoverRow: string; text: string } }) {
-  return (
-    <Link href={href} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 7, fontSize: 12, fontWeight: 500, color: c.textMuted, textDecoration: 'none', transition: 'all 0.12s' }}
-      onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = c.hoverRow; (e.currentTarget as HTMLAnchorElement).style.color = c.text; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = c.textMuted; }}
-    >
-      <span>{icon}</span> {label}
-    </Link>
-  );
-}
-
-// ── Breadcrumb helper ────────────────────────────────────────
-function getSubPath(pathname: string, activeModule: NavModule): string | null {
-  const relative = pathname.slice(activeModule.href.length);
-  if (!relative || relative === '/') return null;
-  const segments = relative.split('/').filter(Boolean);
-  const first    = segments[0];
-  if (!first) return null;
-  // Named route
-  if (BREADCRUMB_MAP[first]) return BREADCRUMB_MAP[first]!;
-  // UUID → check for sub-segment
-  if (/^[0-9a-f-]{36}$/i.test(first)) {
-    const sub = segments[1];
-    if (sub === 'edit')  return 'Edit';
-    if (sub === 'new')   return 'Add New';
-    return 'Detail';
-  }
-  return first.charAt(0).toUpperCase() + first.slice(1).replace(/-/g, ' ');
 }
