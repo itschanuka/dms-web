@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import AdminShell from '@/components/admin/AdminShell';
-import { commissionApi, employeeApi, type Commission, type CommissionStats, type Employee } from '@/lib/api';
+import { commissionApi, employeeApi, type Commission, type CommissionStats, type CommissionSummary, type Employee } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/lib/formatters';
@@ -112,6 +112,8 @@ function CommissionsContent() {
   const [month,       setMonth]       = useState(currentMonth());
   const [status,      setStatus]      = useState('');
   const [empFilter,   setEmpFilter]   = useState('');
+  const [empSummary,  setEmpSummary]  = useState<CommissionSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   // Load stats + employee list (admin only)
   useEffect(() => {
@@ -122,6 +124,27 @@ function CommissionsContent() {
         .catch(() => {});
     }
   }, [isAdmin]);
+
+  // Load employee summary when a specific employee is selected
+  useEffect(() => {
+    if (empFilter) {
+      setSummaryLoading(true);
+      setEmpSummary(null);
+      commissionApi.getEmployeeSummary(empFilter, month)
+        .then(setEmpSummary)
+        .catch(() => {})
+        .finally(() => setSummaryLoading(false));
+    } else if (isSalesp && employee?.id) {
+      // Salespeople always see their own summary
+      setSummaryLoading(true);
+      commissionApi.getEmployeeSummary(employee.id, month)
+        .then(setEmpSummary)
+        .catch(() => {})
+        .finally(() => setSummaryLoading(false));
+    } else {
+      setEmpSummary(null);
+    }
+  }, [empFilter, month, isSalesp, employee?.id]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -176,6 +199,64 @@ function CommissionsContent() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Employee Commission Summary Card */}
+      {(empFilter || isSalesp) && (
+        <div style={{
+          background: t.card, border: `1px solid ${t.border}`, borderRadius: 14,
+          padding: '20px 24px', marginBottom: 20,
+          borderLeft: `4px solid #ec4899`,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 14 }}>
+            💸 Commission Summary — {monthLabel(month)}
+            {empFilter && employees.find(e => e.id === empFilter) && (
+              <span style={{ color: '#ec4899', marginLeft: 8 }}>
+                · {employees.find(e => e.id === empFilter)?.full_name}
+              </span>
+            )}
+          </div>
+          {summaryLoading ? (
+            <div style={{ display: 'flex', gap: 20 }}>
+              {[1,2,3,4].map(i => <div key={i} style={{ height: 40, width: 140, borderRadius: 8, background: 'rgba(128,128,128,0.12)' }} />)}
+            </div>
+          ) : empSummary ? (
+            <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'center' }}>
+              {[
+                { label: 'Deals',        val: empSummary.deal_count,    money: false, color: '#818cf8' },
+                { label: 'Total Earned', val: empSummary.total_earned,  money: true,  color: '#ec4899' },
+                { label: 'Paid Out',     val: empSummary.total_paid,    money: true,  color: '#34d399' },
+                { label: 'Still Owed',   val: empSummary.total_unpaid,  money: true,  color: empSummary.total_unpaid > 0 ? '#ef4444' : '#5a7295' },
+              ].map(s => (
+                <div key={s.label}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: t.muted, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>{s.label}</div>
+                  <div style={{ fontSize: s.money ? 18 : 26, fontWeight: 900, color: s.color, fontFamily: s.money ? 'monospace' : 'inherit' }}>
+                    {s.money ? formatCurrency(s.val as number) : s.val}
+                  </div>
+                </div>
+              ))}
+              {empSummary.total_earned > 0 && (
+                <div style={{ marginLeft: 'auto' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: t.muted, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Paid %</div>
+                  <div style={{ width: 120 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: t.muted, marginBottom: 4 }}>
+                      <span>{Math.round((empSummary.total_paid / empSummary.total_earned) * 100)}%</span>
+                      <span>{formatCurrency(empSummary.total_paid)} / {formatCurrency(empSummary.total_earned)}</span>
+                    </div>
+                    <div style={{ height: 6, background: 'rgba(128,128,128,0.15)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', borderRadius: 3, background: '#34d399', transition: 'width .3s',
+                        width: `${Math.min(100, (empSummary.total_paid / empSummary.total_earned) * 100)}%`,
+                      }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ color: t.muted, fontSize: 13 }}>No commission data for this period.</div>
+          )}
         </div>
       )}
 
