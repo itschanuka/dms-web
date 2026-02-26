@@ -1098,3 +1098,88 @@ export const employeeApi = {
   softDelete: (id: string) =>
     adminFetch<unknown>(`/employees/${id}`, { method: 'DELETE' }),
 };
+
+// ─────────────────────────────────────────────────────────────
+//  PHASE 8 — EXPENSE TRACKING
+// ─────────────────────────────────────────────────────────────
+
+export interface Expense {
+  id:           string;
+  category:     string;
+  description:  string;
+  amount:       number;
+  expense_date: string;
+  reference?:   string | null;
+  notes?:       string | null;
+  vehicle?:     { id: string; stock_id: string; make: string; model: string; year: number } | null;
+  created_by_emp?: { id: string; full_name: string; employee_code: string } | null;
+  created_at:   string;
+  updated_at:   string;
+}
+
+export interface ExpenseListResult {
+  expenses:      Expense[];
+  total:         number;
+  page:          number;
+  limit:         number;
+  pages:         number;
+  running_total: number;
+}
+
+export const expenseApi = {
+  list: (params: Record<string, any> = {}): Promise<ExpenseListResult> =>
+    adminFetch('/expenses?' + new URLSearchParams(params).toString()),
+
+  getById: (id: string): Promise<Expense> =>
+    adminFetch(`/expenses/${id}`),
+
+  create: (input: Record<string, any>): Promise<Expense> =>
+    adminFetch('/expenses', { method: 'POST', body: JSON.stringify(input) }),
+
+  update: (id: string, input: Record<string, any>): Promise<Expense> =>
+    adminFetch(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+
+  delete: (id: string): Promise<{ deleted: boolean }> =>
+    adminFetch(`/expenses/${id}`, { method: 'DELETE' }),
+
+  getCategoryTotals: (date_from?: string, date_to?: string): Promise<{ by_category: Record<string, number>; grand_total: number }> => {
+    const params = new URLSearchParams();
+    if (date_from) params.set('date_from', date_from);
+    if (date_to)   params.set('date_to', date_to);
+    return adminFetch(`/expenses/totals?${params.toString()}`);
+  },
+};
+
+// ─────────────────────────────────────────────────────────────
+//  PHASE 9 — REPORTS & ANALYTICS
+// ─────────────────────────────────────────────────────────────
+
+export interface ReportPayload {
+  title:       string;
+  subtitle?:   string;
+  filters?:    Record<string, string>;
+  summary:     { label: string; value: string | number }[];
+  columns:     { key: string; label: string; format?: string }[];
+  rows:        Record<string, unknown>[];
+  generatedAt: string;
+  generatedBy: string;
+  rowCount:    number;
+}
+
+export interface DashboardData {
+  inventory:   { total_vehicles: number; available_stock: number; sold_vehicles: number; stock_value: number; potential_profit: number };
+  crm:         { total_leads: number; open_leads: number; total_customers: number };
+  sales:       { total_revenue: number; total_profit: number; pending_balances: number };
+  commissions: { unpaid_amount: number };
+  expenses:    { total_expenses: number };
+  employees:   { active_count: number };
+  net_position: number;
+}
+
+export const reportApi = {
+  getDashboard: (): Promise<DashboardData> =>
+    adminFetch('/reports/dashboard'),
+
+  getSalesReport: (name: string, params: Record<string, string> = {}): Promise<ReportPayload> =>
+    adminFetch(`/reports/${name}?` + new URLSearchParams(params).toString()),
+};
