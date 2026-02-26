@@ -26,7 +26,8 @@ const MODULES: NavModule[] = [
 
 interface Props {
   children:    React.ReactNode;
-  activePage?: string;
+  activeKey?: string;
+  activePage?: string;  // legacy alias
 }
 
 export default function AdminShell({ children }: Props) {

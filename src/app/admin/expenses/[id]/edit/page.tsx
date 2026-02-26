@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AdminShell from '@/components/admin/AdminShell';
@@ -17,7 +17,10 @@ const CATEGORIES = [
   { value: 'other',          label: '📦 Other' },
 ];
 
-export default function EditExpensePage({ params }: { params: { id: string } }) {
+interface Props { params: Promise<{ id: string }> }
+
+export default function EditExpensePage({ params }: Props) {
+  const { id } = use(params);
   const t      = useTheme();
   const router = useRouter();
 
@@ -36,7 +39,7 @@ export default function EditExpensePage({ params }: { params: { id: string } }) 
 
   useEffect(() => {
     Promise.all([
-      expenseApi.getById(params.id),
+      expenseApi.getById(id),
       adminApi.listVehicles({ limit: 200, status: 'available' }),
     ]).then(([exp, inv]) => {
       setCategory(exp.category ?? '');
@@ -49,7 +52,7 @@ export default function EditExpensePage({ params }: { params: { id: string } }) 
       setVehicles(inv.vehicles ?? []);
     }).catch(() => setError('Failed to load expense'))
       .finally(() => setLoading(false));
-  }, [params.id]);
+  }, [id]);
 
   const valid = category && description.trim() && Number(amount) > 0 && date;
 
@@ -58,7 +61,7 @@ export default function EditExpensePage({ params }: { params: { id: string } }) 
     setSaving(true);
     setError('');
     try {
-      await expenseApi.update(params.id, {
+      await expenseApi.update(id, {
         category:     category as any,
         description:  description.trim(),
         amount:       Number(amount),
