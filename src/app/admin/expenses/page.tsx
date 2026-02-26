@@ -6,7 +6,11 @@ import AdminShell from '@/components/admin/AdminShell';
 import { expenseApi, type Expense } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';
-import { formatCurrency, formatDate } from '@/lib/formatters';
+import { formatCurrency } from '@/lib/formatters';
+
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
 
 // ── Category config ────────────────────────────────────────────
 

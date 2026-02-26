@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AdminShell from '@/components/admin/AdminShell';
-import { expenseApi, inventoryApi } from '@/lib/api';
+import { expenseApi, adminApi } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 
 const CATEGORIES = [
@@ -34,7 +34,7 @@ export default function NewExpensePage() {
   const [saving,   setSaving]     = useState(false);
 
   useEffect(() => {
-    inventoryApi.list({ limit: 200, status: 'available' })
+    adminApi.listVehicles({ limit: 200, status: 'available' })
       .then(r => setVehicles(r.vehicles ?? []))
       .catch(() => {});
   }, []);

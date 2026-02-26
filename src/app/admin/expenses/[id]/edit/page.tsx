@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AdminShell from '@/components/admin/AdminShell';
-import { expenseApi, inventoryApi } from '@/lib/api';
+import { expenseApi, adminApi } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 
 const CATEGORIES = [
@@ -37,7 +37,7 @@ export default function EditExpensePage({ params }: { params: { id: string } }) 
   useEffect(() => {
     Promise.all([
       expenseApi.getById(params.id),
-      inventoryApi.list({ limit: 200, status: 'available' }),
+      adminApi.listVehicles({ limit: 200, status: 'available' }),
     ]).then(([exp, inv]) => {
       setCategory(exp.category ?? '');
       setDescription(exp.description ?? '');
