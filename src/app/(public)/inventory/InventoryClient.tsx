@@ -53,8 +53,12 @@ export default function InventoryClient({ initialFilters }: Props) {
         ...(transmission && { transmission }),
         sort: sort as 'newest' | 'price_asc' | 'price_desc' | 'year_desc' | 'year_asc',
       });
-      setVehicles(result.vehicles);
-      setPagination(result.pagination);
+      if (!result.success) {
+        setError(result.error.message || 'Failed to load vehicles. Please try again.');
+        return;
+      }
+      setVehicles(result.data.vehicles);
+      setPagination(result.data.pagination);
       setPage(pg);
     } catch {
       setError('Failed to load vehicles. Please try again.');
