@@ -807,6 +807,9 @@ export interface CreateDealData {
 // ─────────────────────────────────────────────────────────────
 
 export const dealApi = {
+  getStats: () =>
+    adminFetch<{ total: number; draft: number; reserved: number; active: number; completed: number; cancelled: number; revenue: number; outstanding: number }>('/deals/stats'),
+
   list: (params: DealListParams = {}) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {

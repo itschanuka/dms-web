@@ -1,396 +1,338 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+export const dynamic = 'force-dynamic';
+
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import Link from 'next/link';
 import AdminShell from '@/components/admin/AdminShell';
-import { dealApi, type PaymentType, type Salesperson, type VehicleSearchResult } from '@/lib/api';
+import { dealApi, type Deal, type DealStatus, type PaymentStatus, type Salesperson } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { formatCurrency } from '@/lib/formatters';
 
+const STATUS_CFG: Record<DealStatus, { label: string; color: string; bg: string; border: string }> = {
+  draft:     { label: 'Draft',     color: '#94a3b8', bg: 'rgba(148,163,184,0.1)',  border: 'rgba(148,163,184,0.28)' },
+  reserved:  { label: 'Reserved',  color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.3)'   },
+  active:    { label: 'Active',    color: '#38bdf8', bg: 'rgba(56,189,248,0.12)',  border: 'rgba(56,189,248,0.32)'  },
+  completed: { label: 'Completed', color: '#34d399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.32)'  },
+  cancelled: { label: 'Cancelled', color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.3)'    },
+};
+const PAY_CFG: Record<PaymentStatus, { label: string; color: string }> = {
+  unpaid:         { label: 'Unpaid',     color: '#ef4444' },
+  partially_paid: { label: 'Partial',    color: '#f59e0b' },
+  fully_paid:     { label: 'Fully Paid', color: '#34d399' },
+};
+const DEAL_STATUSES: DealStatus[]    = ['draft', 'reserved', 'active', 'completed', 'cancelled'];
+const PAY_STATUSES:  PaymentStatus[] = ['unpaid', 'partially_paid', 'fully_paid'];
+const PRESETS = [
+  { key: 'today', label: 'Today' },
+  { key: 'week',  label: 'This Week' },
+  { key: 'month', label: 'This Month' },
+  { key: '3m',    label: 'Last 3 Mo' },
+  { key: 'year',  label: 'This Year' },
+];
+
+function presetRange(key: string) {
+  const now = new Date();
+  const to  = now.toISOString().slice(0, 10);
+  if (key === 'today') return { from: to, to };
+  if (key === 'week')  { const d = new Date(now); d.setDate(d.getDate() - 6);   return { from: d.toISOString().slice(0, 10), to }; }
+  if (key === 'month') return { from: `${to.slice(0, 7)}-01`, to };
+  if (key === '3m')    { const d = new Date(now); d.setMonth(d.getMonth() - 3); return { from: d.toISOString().slice(0, 10), to }; }
+  if (key === 'year')  return { from: `${now.getFullYear()}-01-01`, to };
+  return { from: '', to: '' };
+}
+
 function tok(isDark: boolean) {
   return {
-    page:      isDark ? '#141c2e' : '#dde6f0',
-    card:      isDark ? '#1c2538' : '#cdd8ea',
-    cardInner: isDark ? '#111827' : '#c8d6e8',
-    border:    isDark ? '#263550' : '#aec2d6',
-    text:      isDark ? '#e8f0fc' : '#0f1e32',
-    muted:     isDark ? '#5a7295' : '#4a6278',
-    input:     isDark ? '#0e1729' : '#b8c8db',
-    inputText: isDark ? '#d4e2f4' : '#0f1e32',
-    accent:    '#ef4444',
-    label:     isDark ? '#a0b8d8' : '#2a4a68',
+    page:     isDark ? '#141c2e' : '#dde6f0',
+    card:     isDark ? '#1c2538' : '#cdd8ea',
+    border:   isDark ? '#263550' : '#aec2d6',
+    hoverRow: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+    shadow:   isDark ? '0 16px 48px rgba(0,0,0,0.5)' : '0 8px 30px rgba(0,0,0,0.12)',
+    text:     isDark ? '#e8f0fc' : '#0f1e32',
+    muted:    isDark ? '#5a7295' : '#4a6278',
+    input:    isDark ? '#0e1729' : '#b8c8db',
+    inputTxt: isDark ? '#d4e2f4' : '#0f1e32',
+    accent:   '#ef4444',
   };
 }
 
-interface CustomerResult {
-  id: string;
-  customer_code: string;
-  full_name: string;
-  phone_primary: string;
-  status: string;
+interface DealStats {
+  total: number; draft: number; reserved: number;
+  active: number; completed: number; cancelled: number;
+  revenue: number; outstanding: number;
 }
 
-export default function NewDealPage() {
+function Skeleton({ w = '70%' }: { w?: string }) {
+  return <div style={{ height: 13, borderRadius: 4, background: 'rgba(128,128,128,0.12)', width: w }} />;
+}
+
+function SummaryCards({ stats, loading, t }: { stats: DealStats | null; loading: boolean; t: ReturnType<typeof tok> }) {
+  const cards = [
+    { label: 'Total Deals',   val: stats?.total,       money: false, color: '#818cf8', icon: '🤝' },
+    { label: 'Active',        val: stats?.active,      money: false, color: '#38bdf8', icon: '⚡' },
+    { label: 'Reserved',      val: stats?.reserved,    money: false, color: '#f59e0b', icon: '📌' },
+    { label: 'Completed',     val: stats?.completed,   money: false, color: '#34d399', icon: '✅' },
+    { label: 'Total Revenue', val: stats?.revenue,     money: true,  color: '#34d399', icon: '💰' },
+    { label: 'Outstanding',   val: stats?.outstanding, money: true,  color: '#ef4444', icon: '⏳' },
+  ];
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, marginBottom: 20 }}>
+      {cards.map(c => (
+        <div key={c.label} style={{
+          background: t.card, border: `1px solid ${t.border}`,
+          borderRadius: 12, padding: '14px 16px', borderTop: `3px solid ${c.color}`,
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: t.muted, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 9 }}>
+            {c.icon} {c.label}
+          </div>
+          {loading ? <Skeleton /> : (
+            <div style={{ fontSize: c.money ? 13 : 22, fontWeight: 900, color: c.color, fontFamily: c.money ? 'monospace' : 'inherit' }}>
+              {c.money ? formatCurrency(c.val as number) : c.val}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DealsContent() {
   const { isDark } = useTheme();
   const t = tok(isDark);
-  const router = useRouter();
 
-  const [vehicleId,       setVehicleId]       = useState('');
-  const [vehicleDisplay,  setVehicleDisplay]  = useState('');
-  const [customerId,      setCustomerId]      = useState('');
-  const [customerDisplay, setCustomerDisplay] = useState('');
-  const [salespersonId,   setSalespersonId]   = useState('');
-  const [dealDate,        setDealDate]        = useState(new Date().toISOString().split('T')[0]!);
-  const [sellingPrice,    setSellingPrice]    = useState('');
-  const [discountAmount,  setDiscountAmount]  = useState('0');
-  const [paymentType,     setPaymentType]     = useState<PaymentType>('cash');
-  const [reservationAmt,  setReservationAmt]  = useState('');
-  const [reservationDate, setReservationDate] = useState('');
-  const [reservationExp,  setReservationExp]  = useState('');
-  const [notes,           setNotes]           = useState('');
+  const [deals,        setDeals]        = useState<Deal[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [total,        setTotal]        = useState(0);
+  const [page,         setPage]         = useState(1);
+  const [totalPages,   setTotalPages]   = useState(1);
+  const [salespersons, setSalespersons] = useState<Salesperson[]>([]);
+  const [stats,        setStats]        = useState<DealStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
-  const [salespersons,    setSalespersons]    = useState<Salesperson[]>([]);
-  const [vehicleSearch,   setVehicleSearch]   = useState('');
-  const [vehicleResults,  setVehicleResults]  = useState<VehicleSearchResult[]>([]);
-  const [customerSearch,  setCustomerSearch]  = useState('');
-  const [customerResults, setCustomerResults] = useState<CustomerResult[]>([]);
-  const [vehicleOpen,     setVehicleOpen]     = useState(false);
-  const [customerOpen,    setCustomerOpen]    = useState(false);
-
-  const [submitting, setSubmitting] = useState(false);
-  const [error,      setError]      = useState('');
-
-  const vTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [status,       setStatus]       = useState('');
+  const [payStatus,    setPayStatus]    = useState('');
+  const [spId,         setSpId]         = useState('');
+  const [search,       setSearch]       = useState('');
+  const [dateFrom,     setDateFrom]     = useState('');
+  const [dateTo,       setDateTo]       = useState('');
+  const [activePreset, setActivePreset] = useState('');
 
   useEffect(() => {
+    dealApi.getStats().then(setStats).catch(() => {}).finally(() => setStatsLoading(false));
     dealApi.getSalespersons().then(setSalespersons).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (vehicleSearch.length < 2) { setVehicleResults([]); setVehicleOpen(false); return; }
-    if (vTimer.current) clearTimeout(vTimer.current);
-    vTimer.current = setTimeout(async () => {
-      const r = await dealApi.searchVehicles(vehicleSearch);
-      setVehicleResults(r); setVehicleOpen(true);
-    }, 300);
-  }, [vehicleSearch]);
-
-  useEffect(() => {
-    if (customerSearch.length < 2) { setCustomerResults([]); setCustomerOpen(false); return; }
-    if (cTimer.current) clearTimeout(cTimer.current);
-    cTimer.current = setTimeout(async () => {
-      const r = await dealApi.searchCustomers(customerSearch);
-      setCustomerResults(r); setCustomerOpen(true);
-    }, 300);
-  }, [customerSearch]);
-
-  const selectVehicle = (v: VehicleSearchResult) => {
-    setVehicleId(v.id);
-    setVehicleDisplay(`${v.make} ${v.model} (${v.year}) — ${v.stock_id}`);
-    if (!sellingPrice) setSellingPrice(String(v.asking_price));
-    setVehicleSearch(''); setVehicleResults([]); setVehicleOpen(false);
-  };
-
-  const selectCustomer = (c: CustomerResult) => {
-    setCustomerId(c.id);
-    setCustomerDisplay(`${c.full_name} · ${c.phone_primary}`);
-    setCustomerSearch(''); setCustomerResults([]); setCustomerOpen(false);
-  };
-
-  const handleSubmit = async () => {
-    if (!vehicleId || !customerId || !salespersonId || !sellingPrice || !dealDate) {
-      setError('Please fill in all required fields.'); return;
-    }
-    setSubmitting(true); setError('');
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await dealApi.create({
-        vehicle_id:      vehicleId,
-        customer_id:     customerId,
-        salesperson_id:  salespersonId,
-        deal_date:       dealDate,
-        selling_price:   parseFloat(sellingPrice),
-        discount_amount: parseFloat(discountAmount || '0'),
-        payment_type:    paymentType,
-        reservation_amount: reservationAmt ? parseFloat(reservationAmt) : undefined,
-        reservation_date:   reservationDate || undefined,
-        reservation_expiry: reservationExp  || undefined,
-        notes: notes || undefined,
+      const res = await dealApi.list({
+        page, limit: 25,
+        status:         status    || undefined,
+        payment_status: payStatus || undefined,
+        salesperson_id: spId      || undefined,
+        search:         search    || undefined,
+        date_from:      dateFrom  || undefined,
+        date_to:        dateTo    || undefined,
       });
-      router.push(`/admin/deals/${res.id}`);
-    } catch (e) {
-      setError(String(e));
+      setDeals(res.deals);
+      setTotal(res.pagination.total);
+      setTotalPages(res.pagination.totalPages);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
-  };
+  }, [page, status, payStatus, spId, search, dateFrom, dateTo]);
 
-  const inputSt: React.CSSProperties = {
-    background: t.input, color: t.inputText, border: `1px solid ${t.border}`,
-    borderRadius: 8, padding: '9px 12px', fontSize: 14, outline: 'none', width: '100%',
-  };
-  const labelSt: React.CSSProperties = {
-    display: 'block', fontSize: 12, fontWeight: 700, color: t.label,
-    textTransform: 'uppercase' as const, letterSpacing: '.05em', marginBottom: 6,
-  };
+  useEffect(() => { load(); }, [load]);
 
-  const eff = parseFloat(sellingPrice || '0') - parseFloat(discountAmount || '0');
-  const canSubmit = !submitting && !!vehicleId && !!customerId && !!salespersonId && !!sellingPrice;
+  const applyPreset = (key: string) => {
+    const r = presetRange(key);
+    setDateFrom(r.from); setDateTo(r.to);
+    setActivePreset(key); setPage(1);
+  };
+  const clearFilters = () => {
+    setStatus(''); setPayStatus(''); setSpId('');
+    setSearch(''); setDateFrom(''); setDateTo('');
+    setActivePreset(''); setPage(1);
+  };
+  const hasFilter = !!(status || payStatus || spId || search || dateFrom || dateTo);
+
+  const inp: React.CSSProperties = {
+    background: t.input, color: t.inputTxt, border: `1px solid ${t.border}`,
+    borderRadius: 8, padding: '7px 11px', fontSize: 13, outline: 'none',
+  };
 
   return (
-    <AdminShell activePage="deals">
-      <div style={{ minHeight: '100vh', background: t.page, padding: '32px 40px' }}>
+    <div style={{ minHeight: '100vh', background: t.page, padding: '28px 32px' }}>
 
-        <div style={{ marginBottom: 28 }}>
-          <button onClick={() => router.back()} style={{
-            background: 'transparent', border: 'none', color: t.muted,
-            cursor: 'pointer', fontSize: 13, marginBottom: 12, padding: 0,
-          }}>← Back to Deals</button>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: t.text, margin: 0 }}>New Deal</h1>
-          <p style={{ color: t.muted, fontSize: 14, margin: '4px 0 0' }}>Create a new sales deal</p>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 900, color: t.text, margin: 0 }}>Deals</h1>
+          <p style={{ color: t.muted, fontSize: 13, margin: '3px 0 0' }}>
+            {hasFilter ? `${total} matching filters` : `${total} deals total`}
+          </p>
+        </div>
+        <Link href="/admin/deals/new" style={{
+          background: t.accent, color: '#fff', borderRadius: 10,
+          padding: '10px 22px', fontWeight: 700, fontSize: 14, textDecoration: 'none',
+          boxShadow: '0 2px 12px rgba(239,68,68,0.35)',
+        }}>+ New Deal</Link>
+      </div>
+
+      {/* Summary cards */}
+      <SummaryCards stats={stats} loading={statsLoading} t={t} />
+
+      {/* Filters */}
+      <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 14, padding: '14px 18px', marginBottom: 20 }}>
+
+        {/* Date preset row */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: t.muted, textTransform: 'uppercase', letterSpacing: '.06em', marginRight: 4 }}>Period:</span>
+          {PRESETS.map(p => (
+            <button key={p.key} onClick={() => applyPreset(p.key)} style={{
+              padding: '4px 11px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
+              background: activePreset === p.key ? '#6366f1'            : 'transparent',
+              color:      activePreset === p.key ? '#fff'                : t.muted,
+              border:     activePreset === p.key ? '1px solid #6366f1'  : `1px solid ${t.border}`,
+            }}>{p.label}</button>
+          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
+            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setActivePreset(''); setPage(1); }}
+              style={{ ...inp, fontSize: 12, width: 138 }} />
+            <span style={{ color: t.muted, fontSize: 12 }}>→</span>
+            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setActivePreset(''); setPage(1); }}
+              style={{ ...inp, fontSize: 12, width: 138 }} />
+          </div>
         </div>
 
-        {error && (
-          <div style={{
-            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: 10, padding: '12px 16px', color: '#ef4444', marginBottom: 20, fontSize: 14,
-          }}>{error}</div>
-        )}
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 24, alignItems: 'start' }}>
-
-          {/* ── Main form ── */}
-          <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 16, overflow: 'hidden' }}>
-            <div style={{ padding: '20px 24px', borderBottom: `1px solid ${t.border}` }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: t.text, margin: 0 }}>Deal Details</h2>
-            </div>
-            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-              {/* Vehicle picker */}
-              <div style={{ position: 'relative' }}>
-                <label style={labelSt}>Vehicle *</label>
-                {vehicleId ? (
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{ ...inputSt, background: t.cardInner, color: '#34d399', fontWeight: 600, flex: 1 }}>
-                      ✓ {vehicleDisplay}
-                    </div>
-                    <button onClick={() => { setVehicleId(''); setVehicleDisplay(''); setSellingPrice(''); }}
-                      style={{
-                        background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-                        borderRadius: 8, padding: '9px 14px', color: '#ef4444', cursor: 'pointer',
-                        fontSize: 13, fontWeight: 700,
-                      }}>Change</button>
-                  </div>
-                ) : (
-                  <>
-                    <input
-                      value={vehicleSearch}
-                      onChange={e => setVehicleSearch(e.target.value)}
-                      placeholder="Search by make, model, stock ID…"
-                      style={inputSt}
-                    />
-                    {vehicleOpen && vehicleResults.length > 0 && (
-                      <div style={{
-                        position: 'absolute', zIndex: 50, width: '100%', top: '100%', marginTop: 4,
-                        background: t.card, border: `1px solid ${t.border}`, borderRadius: 10,
-                        boxShadow: '0 8px 30px rgba(0,0,0,0.4)', overflow: 'hidden',
-                      }}>
-                        {vehicleResults.map(v => (
-                          <div key={v.id} onClick={() => selectVehicle(v)}
-                            style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                          >
-                            <div>
-                              <div style={{ color: t.text, fontWeight: 600, fontSize: 14 }}>{v.make} {v.model} ({v.year})</div>
-                              <div style={{ color: t.muted, fontSize: 12 }}>{v.stock_id} · {v.status}</div>
-                            </div>
-                            <div style={{ color: '#34d399', fontWeight: 700, fontFamily: 'monospace' }}>{formatCurrency(v.asking_price)}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Customer picker */}
-              <div style={{ position: 'relative' }}>
-                <label style={labelSt}>Customer *</label>
-                {customerId ? (
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{ ...inputSt, background: t.cardInner, color: '#34d399', fontWeight: 600, flex: 1 }}>
-                      ✓ {customerDisplay}
-                    </div>
-                    <button onClick={() => { setCustomerId(''); setCustomerDisplay(''); }}
-                      style={{
-                        background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-                        borderRadius: 8, padding: '9px 14px', color: '#ef4444', cursor: 'pointer',
-                        fontSize: 13, fontWeight: 700,
-                      }}>Change</button>
-                  </div>
-                ) : (
-                  <>
-                    <input
-                      value={customerSearch}
-                      onChange={e => setCustomerSearch(e.target.value)}
-                      placeholder="Search by name, phone, customer code…"
-                      style={inputSt}
-                    />
-                    {customerOpen && customerResults.length > 0 && (
-                      <div style={{
-                        position: 'absolute', zIndex: 50, width: '100%', top: '100%', marginTop: 4,
-                        background: t.card, border: `1px solid ${t.border}`, borderRadius: 10,
-                        boxShadow: '0 8px 30px rgba(0,0,0,0.4)', overflow: 'hidden',
-                      }}>
-                        {customerResults.map(c => (
-                          <div key={c.id}
-                            onClick={() => c.status !== 'blacklisted' ? selectCustomer(c) : undefined}
-                            style={{
-                              padding: '10px 16px', cursor: c.status === 'blacklisted' ? 'not-allowed' : 'pointer',
-                              borderBottom: `1px solid ${t.border}`, opacity: c.status === 'blacklisted' ? 0.5 : 1,
-                            }}
-                            onMouseEnter={e => { if (c.status !== 'blacklisted') e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                          >
-                            <div style={{ color: t.text, fontWeight: 600, fontSize: 14 }}>{c.full_name}</div>
-                            <div style={{ color: t.muted, fontSize: 12 }}>
-                              {c.phone_primary} · {c.customer_code}
-                              {c.status === 'blacklisted' && <span style={{ color: '#ef4444', marginLeft: 8 }}>🚫 Blacklisted</span>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Salesperson + Date */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div>
-                  <label style={labelSt}>Salesperson *</label>
-                  <select value={salespersonId} onChange={e => setSalespersonId(e.target.value)}
-                    style={{ ...inputSt, cursor: 'pointer' }}>
-                    <option value="">Select salesperson…</option>
-                    {salespersons.map(s => (
-                      <option key={s.id} value={s.id}>{s.full_name} ({s.role})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={labelSt}>Deal Date *</label>
-                  <input type="date" value={dealDate} onChange={e => setDealDate(e.target.value)} style={inputSt} />
-                </div>
-              </div>
-
-              {/* Price + Discount */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div>
-                  <label style={labelSt}>Selling Price (LKR) *</label>
-                  <input type="number" value={sellingPrice} onChange={e => setSellingPrice(e.target.value)}
-                    placeholder="0.00" style={inputSt} />
-                </div>
-                <div>
-                  <label style={labelSt}>Discount (LKR)</label>
-                  <input type="number" value={discountAmount} onChange={e => setDiscountAmount(e.target.value)}
-                    placeholder="0.00" style={inputSt} />
-                </div>
-              </div>
-
-              {/* Payment type */}
-              <div>
-                <label style={labelSt}>Payment Type *</label>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  {(['cash', 'finance', 'mixed'] as PaymentType[]).map(pt => (
-                    <button key={pt} onClick={() => setPaymentType(pt)} style={{
-                      flex: 1, padding: '9px 0', borderRadius: 8, fontSize: 13,
-                      fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
-                      textTransform: 'capitalize',
-                      background: paymentType === pt ? t.accent : t.input,
-                      color:      paymentType === pt ? '#fff'    : t.muted,
-                      border: `1px solid ${paymentType === pt ? t.accent : t.border}`,
-                    }}>{pt}</button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Reservation */}
-              <div style={{ background: t.cardInner, border: `1px solid ${t.border}`, borderRadius: 10, padding: 16 }}>
-                <label style={{ ...labelSt, marginBottom: 12 }}>Reservation (Optional)</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label style={{ ...labelSt, fontSize: 11 }}>Deposit Amount</label>
-                    <input type="number" value={reservationAmt} onChange={e => setReservationAmt(e.target.value)} placeholder="0.00" style={inputSt} />
-                  </div>
-                  <div>
-                    <label style={{ ...labelSt, fontSize: 11 }}>Reservation Date</label>
-                    <input type="date" value={reservationDate} onChange={e => setReservationDate(e.target.value)} style={inputSt} />
-                  </div>
-                  <div>
-                    <label style={{ ...labelSt, fontSize: 11 }}>Expiry Date</label>
-                    <input type="date" value={reservationExp} onChange={e => setReservationExp(e.target.value)} style={inputSt} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label style={labelSt}>Notes</label>
-                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
-                  placeholder="Internal notes…"
-                  style={{ ...inputSt, resize: 'vertical', fontFamily: 'inherit' }} />
-              </div>
-
-            </div>
-          </div>
-
-          {/* ── Sidebar ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 16, padding: 24 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: t.muted, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 20px' }}>
-                Deal Summary
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                  <span style={{ color: t.muted }}>Selling Price</span>
-                  <span style={{ color: t.text, fontFamily: 'monospace', fontWeight: 600 }}>{formatCurrency(parseFloat(sellingPrice || '0'))}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                  <span style={{ color: t.muted }}>Discount</span>
-                  <span style={{ color: '#ef4444', fontFamily: 'monospace', fontWeight: 600 }}>− {formatCurrency(parseFloat(discountAmount || '0'))}</span>
-                </div>
-                <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: 16 }}>
-                  <span style={{ color: t.text, fontWeight: 700 }}>Effective Price</span>
-                  <span style={{ color: '#34d399', fontFamily: 'monospace', fontWeight: 800 }}>{formatCurrency(Math.max(0, eff))}</span>
-                </div>
-                {reservationAmt && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                    <span style={{ color: t.muted }}>Reservation Deposit</span>
-                    <span style={{ color: '#f59e0b', fontFamily: 'monospace', fontWeight: 600 }}>{formatCurrency(parseFloat(reservationAmt))}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <button onClick={handleSubmit} disabled={!canSubmit} style={{
-              background: canSubmit ? t.accent : 'rgba(239,68,68,0.3)',
-              color: '#fff', border: 'none', borderRadius: 12, padding: '14px 0',
-              fontSize: 15, fontWeight: 800, cursor: canSubmit ? 'pointer' : 'not-allowed', width: '100%',
-            }}>
-              {submitting ? 'Creating…' : '🤝 Create Deal'}
-            </button>
-
-            <button onClick={() => router.back()} style={{
-              background: 'transparent', color: t.muted, border: `1px solid ${t.border}`,
-              borderRadius: 12, padding: '12px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer', width: '100%',
-            }}>
-              Cancel
-            </button>
-          </div>
-
+        {/* Search + dropdown row */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+            placeholder="🔍  Deal code, customer name…" style={{ ...inp, minWidth: 230 }} />
+          <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }} style={{ ...inp, cursor: 'pointer' }}>
+            <option value="">All Statuses</option>
+            {DEAL_STATUSES.map(s => <option key={s} value={s}>{STATUS_CFG[s].label}</option>)}
+          </select>
+          <select value={payStatus} onChange={e => { setPayStatus(e.target.value); setPage(1); }} style={{ ...inp, cursor: 'pointer' }}>
+            <option value="">All Payments</option>
+            {PAY_STATUSES.map(s => <option key={s} value={s}>{PAY_CFG[s].label}</option>)}
+          </select>
+          <select value={spId} onChange={e => { setSpId(e.target.value); setPage(1); }} style={{ ...inp, cursor: 'pointer' }}>
+            <option value="">All Salespersons</option>
+            {salespersons.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+          </select>
+          {hasFilter && (
+            <button onClick={clearFilters} style={{
+              padding: '7px 13px', borderRadius: 8, border: `1px solid rgba(239,68,68,0.4)`,
+              background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}>✕ Clear all</button>
+          )}
         </div>
       </div>
+
+      {/* Table */}
+      <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 16, boxShadow: t.shadow, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.04)', borderBottom: `1px solid ${t.border}` }}>
+              {['Deal', 'Customer', 'Vehicle', 'Salesperson', 'Status', 'Price', 'Paid', 'Balance', 'Payment', 'Date'].map(h => (
+                <th key={h} style={{ padding: '11px 14px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '.07em', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              Array.from({ length: 7 }).map((_, i) => (
+                <tr key={i} style={{ borderTop: `1px solid ${t.border}` }}>
+                  {Array.from({ length: 10 }).map((_, j) => (
+                    <td key={j} style={{ padding: '14px 14px' }}><Skeleton w={`${50 + (j * 7) % 40}%`} /></td>
+                  ))}
+                </tr>
+              ))
+            ) : deals.length === 0 ? (
+              <tr>
+                <td colSpan={10} style={{ padding: 64, textAlign: 'center' }}>
+                  <div style={{ fontSize: 34, marginBottom: 10 }}>🤝</div>
+                  <div style={{ fontWeight: 700, color: t.text, marginBottom: 4 }}>No deals found</div>
+                  <div style={{ color: t.muted, fontSize: 13, marginBottom: 16 }}>
+                    {hasFilter ? 'Try adjusting your filters.' : 'Create your first deal to get started.'}
+                  </div>
+                  {!hasFilter && (
+                    <Link href="/admin/deals/new" style={{ background: t.accent, color: '#fff', textDecoration: 'none', padding: '9px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700 }}>
+                      + New Deal
+                    </Link>
+                  )}
+                </td>
+              </tr>
+            ) : deals.map((deal, i) => {
+              const sc  = STATUS_CFG[deal.status];
+              const pc  = PAY_CFG[deal.payment_status];
+              const eff = deal.selling_price - (deal.discount_amount ?? 0);
+              const bal = Math.max(0, eff - (deal.total_paid_cache ?? 0));
+              return (
+                <tr key={deal.id}
+                  style={{ borderTop: i > 0 ? `1px solid ${t.border}` : 'none', transition: 'background .1s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = t.hoverRow)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <td style={{ padding: '12px 14px' }}>
+                    <Link href={`/admin/deals/${deal.id}`} style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 700, fontFamily: 'monospace', fontSize: 13 }}>
+                      {deal.deal_code}
+                    </Link>
+                  </td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <div style={{ fontWeight: 600, color: t.text }}>{deal.customer?.full_name ?? '—'}</div>
+                    <div style={{ color: t.muted, fontSize: 11 }}>{deal.customer?.phone_primary}</div>
+                  </td>
+                  <td style={{ padding: '12px 14px' }}>
+                    {deal.vehicle ? (
+                      <><div style={{ fontWeight: 600, color: t.text }}>{deal.vehicle.make} {deal.vehicle.model}</div>
+                      <div style={{ color: t.muted, fontSize: 11 }}>{deal.vehicle.year} · {deal.vehicle.stock_id}</div></>
+                    ) : <span style={{ color: t.muted }}>—</span>}
+                  </td>
+                  <td style={{ padding: '12px 14px', color: t.text, whiteSpace: 'nowrap' }}>{deal.salesperson?.full_name ?? '—'}</td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <span style={{ display: 'inline-block', padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, color: sc.color, background: sc.bg, border: `1px solid ${sc.border}` }}>
+                      {sc.label}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 14px', color: t.text, fontWeight: 600, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{formatCurrency(deal.selling_price)}</td>
+                  <td style={{ padding: '12px 14px', color: '#34d399', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{formatCurrency(deal.total_paid_cache ?? 0)}</td>
+                  <td style={{ padding: '12px 14px', fontFamily: 'monospace', fontWeight: 600, whiteSpace: 'nowrap', color: bal > 0 ? '#ef4444' : '#34d399' }}>{formatCurrency(bal)}</td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <span style={{ color: pc.color, fontSize: 12, fontWeight: 600 }}>{pc.label}</span>
+                  </td>
+                  <td style={{ padding: '12px 14px', color: t.muted, fontSize: 12, whiteSpace: 'nowrap' }}>
+                    {new Date(deal.deal_date).toLocaleDateString()}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderTop: `1px solid ${t.border}` }}>
+            <span style={{ color: t.muted, fontSize: 13 }}>Page {page} of {totalPages} · {total} results</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} style={{ background: page <= 1 ? t.input : t.accent, color: page <= 1 ? t.muted : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 13, cursor: page <= 1 ? 'not-allowed' : 'pointer' }}>← Prev</button>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={{ background: page >= totalPages ? t.input : t.accent, color: page >= totalPages ? t.muted : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 13, cursor: page >= totalPages ? 'not-allowed' : 'pointer' }}>Next →</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function DealsPage() {
+  const { isDark } = useTheme();
+  return (
+    <AdminShell activePage="deals">
+      <Suspense fallback={<div style={{ padding: 48, textAlign: 'center', color: isDark ? '#5a7295' : '#4a6278' }}>Loading…</div>}>
+        <DealsContent />
+      </Suspense>
     </AdminShell>
   );
 }
