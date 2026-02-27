@@ -139,16 +139,27 @@ export default function CustomersPage() {
             placeholder="Search name, phone, NIC, code…"
             value={search}
             onChange={e => setSearch(e.target.value)}
+            aria-label="Search customers"
             style={INP}
           />
-          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={SEL}>
+          <select
+            value={typeFilter}
+            onChange={e => setTypeFilter(e.target.value)}
+            style={SEL}
+            aria-label="Filter by customer type"
+          >
             <option value="">All Types</option>
             <option value="individual">Individual</option>
             <option value="business">Business</option>
             <option value="dealer_trader">Dealer / Trader</option>
             <option value="repeat_buyer">Repeat Buyer</option>
           </select>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={SEL}>
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            style={SEL}
+            aria-label="Filter by customer status"
+          >
             <option value="">All Statuses</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -158,6 +169,7 @@ export default function CustomersPage() {
             <button
               onClick={() => { setSearch(''); setTypeFilter(''); setStatusFilter(''); }}
               style={{ background: 'none', border: `1px solid ${c.border}`, borderRadius: 7, padding: '7px 12px', fontSize: 12, color: c.muted, cursor: 'pointer' }}
+              aria-label="Clear all customer filters"
             >
               Clear
             </button>
@@ -166,15 +178,24 @@ export default function CustomersPage() {
 
         {/* ── Error ── */}
         {error && (
-          <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#ef4444' }}>
+          <div
+            role="alert"
+            aria-live="polite"
+            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#ef4444' }}
+          >
             {error}
           </div>
         )}
 
         {/* ── Table ── */}
-        <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
+        <div
+          style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}
+          aria-busy={loading}
+        >
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: c.muted, fontSize: 14 }}>Loading customers…</div>
+            <div style={{ padding: 40, textAlign: 'center', color: c.muted, fontSize: 14 }} role="status" aria-live="polite">
+              Loading customers…
+            </div>
           ) : customers.length === 0 ? (
             <div style={{ padding: 48, textAlign: 'center' }}>
               <div style={{ fontSize: 32, marginBottom: 12 }}>👤</div>

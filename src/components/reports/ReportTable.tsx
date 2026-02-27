@@ -96,9 +96,26 @@ export default function ReportTable({
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={columns.length} style={{ padding: 40, textAlign: 'center', color: t.muted, fontSize: 13 }}>Loading...</td></tr>
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    style={{ padding: 40, textAlign: 'center', color: t.muted, fontSize: 13 }}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    Loading report…
+                  </td>
+                </tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={columns.length} style={{ padding: 40, textAlign: 'center', color: t.muted, fontSize: 13 }}>No data available</td></tr>
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    style={{ padding: 40, textAlign: 'center', color: t.muted, fontSize: 13 }}
+                    aria-live="polite"
+                  >
+                    No data available for the selected filters
+                  </td>
+                </tr>
               ) : rows.map((row, i) => (
                 <tr key={i} style={{ borderTop: `1px solid ${t.border}`, background: i % 2 === 1 ? `${t.border}22` : 'transparent' }}>
                   {columns.map(col => {

@@ -52,21 +52,51 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} aria-busy={loading}>
           {error && (
-            <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: '#fca5a5' }}>
+            <div
+              id="login-error"
+              role="alert"
+              aria-live="assertive"
+              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: '#fca5a5' }}
+            >
               {error}
             </div>
           )}
 
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Email address</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" placeholder="you@dealership.com" style={inputStyle} disabled={loading} />
+            <label htmlFor="admin-login-email" style={labelStyle}>Email address</label>
+            <input
+              id="admin-login-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              placeholder="you@dealership.com"
+              style={inputStyle}
+              disabled={loading}
+              autoFocus
+              aria-invalid={!!error}
+              aria-describedby={error ? 'login-error' : undefined}
+            />
           </div>
 
           <div style={{ marginBottom: 8 }}>
-            <label style={labelStyle}>Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" placeholder="••••••••" style={inputStyle} disabled={loading} />
+            <label htmlFor="admin-login-password" style={labelStyle}>Password</label>
+            <input
+              id="admin-login-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              placeholder="••••••••"
+              style={inputStyle}
+              disabled={loading}
+              aria-invalid={!!error}
+              aria-describedby={error ? 'login-error' : undefined}
+            />
           </div>
 
           <div style={{ textAlign: 'right', marginBottom: 24 }}>

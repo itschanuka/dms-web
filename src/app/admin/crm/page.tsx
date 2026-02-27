@@ -786,7 +786,15 @@ function CrmPageInner() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   if (!mounted) {
-    return <div style={{ padding: 40, color: '#5a7295', fontSize: 13 }}>Loading…</div>;
+    return (
+      <div
+        style={{ padding: 40, color: '#5a7295', fontSize: 13 }}
+        role="status"
+        aria-live="polite"
+      >
+        Loading…
+      </div>
+    );
   }
   return <CrmPageContent />;
 }
@@ -794,7 +802,17 @@ function CrmPageInner() {
 export default function CrmPage() {
   return (
     <AdminShell>
-      <Suspense fallback={<div style={{ padding: 40, color: '#5a7295', fontSize: 13 }}>Loading…</div>}>
+      <Suspense
+        fallback={
+          <div
+            style={{ padding: 40, color: '#5a7295', fontSize: 13 }}
+            role="status"
+            aria-live="polite"
+          >
+            Loading…
+          </div>
+        }
+      >
         <CrmPageInner />
       </Suspense>
     </AdminShell>

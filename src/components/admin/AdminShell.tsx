@@ -132,7 +132,10 @@ export default function AdminShell({ children }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
 
           {/* Theme toggle */}
-          <button onClick={toggleTheme} title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+          <button
+            onClick={toggleTheme}
+            title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+            aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)', border: `1px solid ${c.border}`, borderRadius: 20, padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: c.textMuted, transition: 'all 0.15s' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#6366f1'; (e.currentTarget as HTMLButtonElement).style.color = '#6366f1'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = c.border; (e.currentTarget as HTMLButtonElement).style.color = c.textMuted; }}
@@ -140,7 +143,10 @@ export default function AdminShell({ children }: Props) {
             {isDark ? '☀️' : '🌙'}
           </button>
 
-          <Link href="/" target="_blank"
+          <Link
+            href="/"
+            target="_blank"
+            aria-label="Open public site in a new tab"
             style={{ fontSize: 11, color: c.textMuted, textDecoration: 'none', padding: '4px 10px', border: `1px solid ${c.border}`, borderRadius: 20, transition: 'all 0.15s' }}
             onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = c.navHover; (e.currentTarget as HTMLAnchorElement).style.borderColor = '#6366f1'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = c.textMuted; (e.currentTarget as HTMLAnchorElement).style.borderColor = c.border; }}
@@ -149,7 +155,10 @@ export default function AdminShell({ children }: Props) {
           </Link>
 
           {/* Avatar */}
-          <button onClick={() => setProfileOpen(o => !o)}
+          <button
+            onClick={() => setProfileOpen(o => !o)}
+            aria-haspopup="menu"
+            aria-expanded={profileOpen}
             style={{ display: 'flex', alignItems: 'center', gap: 8, background: profileOpen ? 'rgba(99,102,241,0.12)' : 'transparent', border: `1px solid ${profileOpen ? 'rgba(99,102,241,0.3)' : c.border}`, borderRadius: 24, padding: '4px 10px 4px 4px', cursor: 'pointer', transition: 'all 0.15s' }}
           >
             <div style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg, ${activeModule.color}33, ${activeModule.color}66)`, border: `1.5px solid ${activeModule.color}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: activeModule.color }}>{initials}</div>
@@ -173,7 +182,10 @@ export default function AdminShell({ children }: Props) {
                 <DDItem href="/admin/audit"           label="Audit Log"       icon="🔐" c={c} />
                 <DDItem href="/admin/trash"           label="Trash"           icon="🗑️" c={c} />
                 <div style={{ height: 1, background: c.border, margin: '6px 0' }} />
-                <button onClick={handleSignOut} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 7, background: 'none', border: 'none', fontSize: 12, fontWeight: 600, color: '#ef4444', cursor: 'pointer', textAlign: 'left' }}>
+                <button
+                  onClick={handleSignOut}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 7, background: 'none', border: 'none', fontSize: 12, fontWeight: 600, color: '#ef4444', cursor: 'pointer', textAlign: 'left' }}
+                >
                   🚪 Sign Out
                 </button>
               </div>
@@ -227,6 +239,7 @@ function NavLink({ mod, active, c }: { mod: NavModule; active: boolean; c: { nav
   return (
     <Link
       href={mod.href}
+      aria-current={active ? 'page' : undefined}
       style={{
         display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px', height: 44,
         fontSize: 12.5, fontWeight: active ? 700 : 500,

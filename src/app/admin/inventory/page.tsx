@@ -399,6 +399,7 @@ export default function InventoryListPage() {
           <input
             type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search make, model, stock ID…"
+            aria-label="Search inventory"
             style={{ ...INPUT, minWidth: 220 }}
           />
 
@@ -408,7 +409,16 @@ export default function InventoryListPage() {
             { value: website, onChange: setWebsite, options: [['', 'Website: All'], ['true','Website: Visible'], ['false','Website: Hidden']] as [string,string][] },
           ].map((f, i) => (
             <div key={i} style={{ position: 'relative' }}>
-              <select value={f.value} onChange={e => f.onChange(e.target.value)} style={SELECT}>
+              <select
+                value={f.value}
+                onChange={e => f.onChange(e.target.value)}
+                style={SELECT}
+                aria-label={
+                  i === 0 ? 'Filter by status' :
+                  i === 1 ? 'Filter by aging bucket' :
+                  'Filter by website visibility'
+                }
+              >
                 {f.options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
               <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: c.textMuted, pointerEvents: 'none' }}>▼</span>
@@ -416,10 +426,14 @@ export default function InventoryListPage() {
           ))}
 
           {(status || aging || search || website) && (
-            <button onClick={() => { setStatus(''); setAging(''); setSearch(''); setWebsite(''); }} style={{
-              background: 'none', border: `1px solid ${c.border}`, borderRadius: 7,
-              color: '#ef4444', fontSize: 12, fontWeight: 600, padding: '7px 12px', cursor: 'pointer',
-            }}>
+            <button
+              onClick={() => { setStatus(''); setAging(''); setSearch(''); setWebsite(''); }}
+              style={{
+                background: 'none', border: `1px solid ${c.border}`, borderRadius: 7,
+                color: '#ef4444', fontSize: 12, fontWeight: 600, padding: '7px 12px', cursor: 'pointer',
+              }}
+              aria-label="Clear all inventory filters"
+            >
               ✕ Clear
             </button>
           )}
@@ -427,15 +441,24 @@ export default function InventoryListPage() {
 
         {/* Error */}
         {error && (
-          <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '12px 16px', color: '#fca5a5', fontSize: 13, marginBottom: 16 }}>
+          <div
+            role="alert"
+            aria-live="polite"
+            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '12px 16px', color: '#fca5a5', fontSize: 13, marginBottom: 16 }}
+          >
             ⚠️ {error}
           </div>
         )}
 
         {/* Table */}
-        <div style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden', transition: 'background 0.25s' }}>
+        <div
+          style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden', transition: 'background 0.25s' }}
+          aria-busy={loading}
+        >
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: c.textSub, fontSize: 13 }}>Loading…</div>
+            <div style={{ padding: 40, textAlign: 'center', color: c.textSub, fontSize: 13 }} role="status" aria-live="polite">
+              Loading…
+            </div>
           ) : vehicles.length === 0 ? (
             <div style={{ padding: 60, textAlign: 'center' }}>
               <div style={{ fontSize: 36, marginBottom: 12 }}>🚗</div>
