@@ -71,12 +71,12 @@ function StatusBadge({ status }: { status: SystemBackup['status'] }) {
   );
 }
 
-function TypeBadge({ type }: { type: SystemBackup['type'] }) {
+function TypeBadge({ backup_type }: { backup_type: SystemBackup['backup_type'] }) {
   const cfg = {
     daily:  { color: '#6366f1', label: '📅 Daily'  },
     weekly: { color: '#0ea5e9', label: '📆 Weekly' },
     manual: { color: '#a855f7', label: '🖐 Manual' },
-  }[type];
+  }[backup_type];
   return (
     <span style={{
       display: 'inline-block', padding: '3px 10px', borderRadius: 20,
@@ -121,7 +121,7 @@ function BackupDrawer({
         {/* Status + Type */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
           <StatusBadge status={backup.status} />
-          <TypeBadge   type={backup.type} />
+          <TypeBadge   backup_type={backup.backup_type} />
         </div>
 
         {/* Main info */}
@@ -503,7 +503,7 @@ export default function BackupsPage() {
                   onClick={() => setSelected(backup)}
                 >
                   <td style={td}><StatusBadge status={backup.status} /></td>
-                  <td style={td}><TypeBadge type={backup.type} /></td>
+                  <td style={td}><TypeBadge backup_type={backup.backup_type} /></td>
                   <td style={td}>
                     <div style={{ fontWeight: 600 }}>{formatDateTime(backup.started_at)}</div>
                     <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>{timeAgo(backup.started_at)}</div>

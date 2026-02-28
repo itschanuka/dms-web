@@ -1262,12 +1262,13 @@ export const auditApi = {
 
 export interface SystemBackup {
   id:              string;
-  type:            'daily' | 'weekly' | 'manual';
+  backup_type:     'daily' | 'weekly' | 'manual';  // ← matches DB column name
   status:          'running' | 'success' | 'failed';
   triggered_by:    string;
   file_path:       string | null;
   file_name:       string | null;
   file_size_bytes: number | null;
+  db_size_bytes:   number | null;   // existing DB column
   tables_included: string[] | null;
   row_counts:      Record<string, number> | null;
   error_message:   string | null;
@@ -1288,10 +1289,10 @@ export interface BackupStats {
 }
 
 export interface BackupListParams {
-  page?:   number;
-  limit?:  number;
-  type?:   'daily' | 'weekly' | 'manual';
-  status?: 'running' | 'success' | 'failed';
+  page?:        number;
+  limit?:       number;
+  backup_type?: 'daily' | 'weekly' | 'manual';
+  status?:      'running' | 'success' | 'failed';
 }
 
 // ─────────────────────────────────────────────────────────────
