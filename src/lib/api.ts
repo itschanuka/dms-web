@@ -1254,3 +1254,88 @@ export const auditApi = {
   stats: (): Promise<{ byModule: { module: string; count: number }[]; recentActions: AuditLog[] }> =>
     adminFetch('/audit-logs/stats'),
 };
+
+
+// ─────────────────────────────────────────────────────────────
+// BACKUP TYPES  (append to bottom of src/lib/api.ts)
+// ─────────────────────────────────────────────────────────────
+
+export interface SystemBackup {
+  id:              string;
+  type:            'daily' | 'weekly' | 'manual';
+  status:          'running' | 'success' | 'failed';
+  triggered_by:    string;
+  file_path:       string | null;
+  file_name:       string | null;
+  file_size_bytes: number | null;
+  tables_included: string[] | null;
+  row_counts:      Record<string, number> | null;
+  error_message:   string | null;
+  started_at:      string;
+  completed_at:    string | null;
+  duration_ms:     number | null;
+}
+
+export interface BackupStats {
+  last_success:       SystemBackup | null;
+  last_failure:       SystemBackup | null;
+  total_backups:      number;
+  successful_backups: number;
+  failed_backups:     number;
+  success_rate:       number;
+  next_daily_at:      string;
+  next_weekly_at:     string;
+}
+
+export interface BackupListParams {
+  page?:   number;
+  limit?:  number;
+  type?:   'daily' | 'weekly' | 'manual';
+  status?: 'running' | 'success' | 'failed';
+}
+
+// ─────────────────────────────────────────────────────────────
+// BACKUP API
+// ─────────────────────────────────────────────────────────────
+
+export const backupApi = {
+  list: (params: BackupListParams = {}): Promise<{
+    backups: SystemBackup[];
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  }> => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v));
+    });
+    return adminFetch(`/backups?${qs.toString()}`);
+  },
+
+  stats: (): Promise<BackupStats> =>
+    adminFetch('/backups/stats'),
+
+  get: (id: string): Promise<SystemBackup> =>
+    adminFetch(`/backups/${id}`),
+
+  trigger: (type: 'daily' | 'weekly' | 'manual' = 'manual'): Promise<{
+    backup_id: string;
+    message:   string;
+    success:   boolean;
+  }> =>
+    adminFetch('/backups/trigger', {
+      method: 'POST',
+      body:   JSON.stringify({ type }),
+    }),
+
+  getDownloadUrl: (id: string): Promise<{
+    url:                string;
+    file_name:          string;
+    expires_in_seconds: number;
+  }> =>
+    adminFetch(`/backups/${id}/download`),
+
+  delete: (id: string): Promise<{ message: string }> =>
+    adminFetch(`/backups/${id}`, { method: 'DELETE' }),
+};

@@ -29,6 +29,7 @@ const MODULES: NavModule[] = [
   // System
   { href: '/admin/trash',       icon: '🗑️', label: 'Trash',       color: '#64748b', group: 'system' },
   { href: '/admin/audit',       icon: '🔐', label: 'Audit Log',   color: '#a855f7', group: 'system' },
+  { href: '/admin/backups',     icon: '💾', label: 'Backups',     color: '#10b981', group: 'system' }, // ← Phase 11
 ];
 
 const BREADCRUMB_MAP: Record<string, string> = {
@@ -42,6 +43,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   employees:   'Employees',
   expenses:    'Expenses',
   crm:         'CRM',
+  backups:     'Backups', // ← Phase 11
 };
 
 interface Props {
@@ -171,6 +173,7 @@ export default function AdminShell({ children }: Props) {
                 </div>
                 <DDItem href="/admin/change-password" label="Change Password" icon="🔑" c={c} />
                 <DDItem href="/admin/audit"           label="Audit Log"       icon="🔐" c={c} />
+                <DDItem href="/admin/backups"         label="Backups"         icon="💾" c={c} />  {/* ← Phase 11 */}
                 <DDItem href="/admin/trash"           label="Trash"           icon="🗑️" c={c} />
                 <div style={{ height: 1, background: c.border, margin: '6px 0' }} />
                 <button onClick={handleSignOut} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 7, background: 'none', border: 'none', fontSize: 12, fontWeight: 600, color: '#ef4444', cursor: 'pointer', textAlign: 'left' }}>

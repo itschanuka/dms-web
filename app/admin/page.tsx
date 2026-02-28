@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useTheme } from '@/lib/theme';
 import AdminShell from '@/components/admin/AdminShell';
 import Link from 'next/link';
-import { adminApi, type AdminVehicle } from '@/lib/api';
+import { adminApi, backupApi, type AdminVehicle, type BackupStats } from '@/lib/api';  // ← added backupApi, BackupStats
 import { formatPrice } from '@/lib/formatters';
 
 // ── Decorative car SVG — purely visual, zero data ─────────────
@@ -53,17 +53,78 @@ const MODULES = [
   { href: '/admin/reports',   icon: '📈', label: 'Reports',    desc: 'Analytics & exports',      color: '#ef4444' },
 ];
 
+// ── Backup Status Widget ──────────────────────────────────────
+function BackupStatusWidget({ stats, t }: { stats: BackupStats | null; t: { textSub: string; bg: string; border: string } }) {
+  function timeAgo(ts: string) {
+    const diff = Date.now() - new Date(ts).getTime();
+    const h    = Math.floor(diff / 3600000);
+    const d    = Math.floor(diff / 86400000);
+    if (d > 0)  return `${d}d ago`;
+    if (h > 0)  return `${h}h ago`;
+    return 'just now';
+  }
+
+  // Still loading — show skeleton matching the green box size
+  if (!stats) {
+    return (
+      <div style={{ marginTop: 12, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 10, padding: '11px 13px' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#10b981', marginBottom: 3 }}>💾 Backup Status</div>
+        <div style={{ fontSize: 11, color: t.textSub }}>Loading…</div>
+      </div>
+    );
+  }
+
+  const lastSuccess = stats.last_success;
+  const isHealthy   = stats.total_backups === 0 || (
+    lastSuccess !== null &&
+    (stats.last_failure === null || lastSuccess.started_at > stats.last_failure.started_at)
+  );
+  const color = stats.total_backups === 0 ? '#f59e0b' : isHealthy ? '#10b981' : '#ef4444';
+
+  return (
+    <Link href="/admin/backups" style={{ display: 'block', marginTop: 12, textDecoration: 'none',
+      background: `${color}10`, border: `1px solid ${color}30`, borderRadius: 10, padding: '11px 13px', transition: 'border-color 0.15s' }}
+      onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = `${color}60`; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = `${color}30`; }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, display: 'inline-block',
+          ...(isHealthy && stats.total_backups > 0 ? { boxShadow: `0 0 5px ${color}` } : {}) }} />
+        💾 Backup Status
+      </div>
+
+      {stats.total_backups === 0 ? (
+        <div style={{ fontSize: 11, color: t.textSub }}>No backups yet — first runs tonight at 03:00 UTC</div>
+      ) : lastSuccess ? (
+        <>
+          <div style={{ fontSize: 11, color: t.textSub }}>
+            Last: <strong style={{ color: '#94a3b8' }}>{timeAgo(lastSuccess.started_at)}</strong>
+            {lastSuccess.file_size_bytes ? ` · ${(lastSuccess.file_size_bytes/ 1024).toFixed(0)} KB` : ''}
+          </div>
+          <div style={{ fontSize: 11, color: t.textSub, marginTop: 2 }}>
+            Rate: <strong style={{ color: stats.success_rate >= 90 ? '#10b981' : '#f59e0b' }}>{stats.success_rate}%</strong>
+            {' · '}{stats.total_backups} total · View all →
+          </div>
+        </>
+      ) : (
+        <div style={{ fontSize: 11, color: '#ef4444' }}>No successful backup recorded yet</div>
+      )}
+    </Link>
+  );
+}
+
 // ── Dashboard ─────────────────────────────────────────────────
 export default function AdminDashboard() {
   const { toggleTheme, isDark } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  const [stats,   setStats]   = useState<InventoryStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
+  const [mounted,     setMounted]     = useState(false);
+  const [stats,       setStats]       = useState<InventoryStats | null>(null);
+  const [backupStats, setBackupStats] = useState<BackupStats | null>(null);  // ← Phase 11
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState('');
 
   useEffect(() => { setMounted(true); }, []);
 
-  // ── Real API call — inventory is the only built module so far ──
+  // ── Real API call — inventory ──────────────────────────────
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -90,16 +151,21 @@ export default function AdminDashboard() {
     void load();
   }, []);
 
+  // ── Backup stats — non-fatal if API not ready yet ──────────
+  useEffect(() => {
+    backupApi.stats()
+      .then(s => setBackupStats(s))
+      .catch(() => {}); // silently ignore — widget shows skeleton
+  }, []);
+
   const dk = isDark;
   const t = {
-    // Surfaces
     bg:        dk ? '#141c2e' : '#dde6f0',
     bgCard:    dk ? '#1c2538' : '#e4edf8',
     border:    dk ? '#263550' : '#aec2d6',
-    // Text — distinct contrast levels
-    text:      dk ? '#e8f0fc' : '#0f1e32',   // primary: near-white on dark, deep navy on light
-    textSub:   dk ? '#7a94b8' : '#2e4a68',   // subtext: readable mid-tone
-    textMuted: dk ? '#3d5270' : '#6a88a8',   // hints: clearly subordinate
+    text:      dk ? '#e8f0fc' : '#0f1e32',
+    textSub:   dk ? '#7a94b8' : '#2e4a68',
+    textMuted: dk ? '#3d5270' : '#6a88a8',
   };
 
   if (!mounted) return null;
@@ -170,7 +236,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ── Inventory KPI — real numbers from DB ─────────── */}
+          {/* ── Inventory KPI ─────────────────────────────────── */}
           <div style={{ fontSize: 11, fontWeight: 700, color: t.textSub, letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 14 }}>
             Inventory — Live
           </div>
@@ -298,13 +364,10 @@ export default function AdminDashboard() {
                 ))}
               </div>
 
-              <div style={{ marginTop: 12, background: dk ? 'rgba(16,185,129,0.07)' : 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 10, padding: '11px 13px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#10b981', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 5px #10b981' }} />
-                  All systems operational
-                </div>
-                <div style={{ fontSize: 11, color: t.textSub }}>Auth · DB · Audit logs · Inventory</div>
-              </div>
+              {/* ── Backup Status Widget — Phase 11 ────────────── */}
+              {/* Replaces the static "All systems operational" box */}
+              <BackupStatusWidget stats={backupStats} t={t} />
+
             </div>
 
           </div>
