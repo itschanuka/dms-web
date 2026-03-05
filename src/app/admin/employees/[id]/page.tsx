@@ -57,9 +57,19 @@ interface PermFlag {
   apiEnforced: boolean; // true = API actually checks the flag, false = UI-only gate
 }
 
+type CrudOp = 'READ' | 'CREATE' | 'EDIT' | 'DELETE';
+
+const CRUD_COLORS: Record<CrudOp, { color: string; bg: string; border: string }> = {
+  READ:   { color: '#38bdf8', bg: 'rgba(56,189,248,0.13)',  border: 'rgba(56,189,248,0.32)'  },
+  CREATE: { color: '#34d399', bg: 'rgba(52,211,153,0.13)',  border: 'rgba(52,211,153,0.32)'  },
+  EDIT:   { color: '#f59e0b', bg: 'rgba(245,158,11,0.13)',  border: 'rgba(245,158,11,0.32)'  },
+  DELETE: { color: '#ef4444', bg: 'rgba(239,68,68,0.13)',   border: 'rgba(239,68,68,0.28)'   },
+};
+
 interface RoleEntry {
-  ops: string;   // what the role can do
-  blocked: boolean; // true = role is completely blocked from this module
+  crud: CrudOp[];    // which CRUD operations this role has
+  ops: string;       // human-readable description
+  blocked: boolean;  // true = role is completely blocked from this module
 }
 
 interface NavModule {
@@ -76,10 +86,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'dashboard', label: 'Dashboard', icon: '📊',
     roleAccess: {
-      admin:       { ops: 'Full stats · Revenue · Inventory · Deal pipeline', blocked: false },
-      manager:     { ops: 'Full stats · Revenue · Inventory · Deal pipeline', blocked: false },
-      salesperson: { ops: 'Own activity · Assigned leads · Own deals', blocked: false },
-      accountant:  { ops: 'Summary stats · Revenue overview', blocked: false },
+      admin:       { crud: ['READ'], ops: 'Full stats · Revenue · Inventory · Deal pipeline', blocked: false },
+      manager:     { crud: ['READ'], ops: 'Full stats · Revenue · Inventory · Deal pipeline', blocked: false },
+      salesperson: { crud: ['READ'], ops: 'Own activity · Assigned leads · Own deals', blocked: false },
+      accountant:  { crud: ['READ'], ops: 'Summary stats · Revenue overview', blocked: false },
     },
     flags: [],
   },
@@ -92,10 +102,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'inventory', label: 'Inventory', icon: '🚗',
     roleAccess: {
-      admin:       { ops: 'View · Create · Edit · Status · Costs · Documents · Website · Delete', blocked: false },
-      manager:     { ops: 'View · Create · Edit · Status changes · Costs · Documents · Website · Delete', blocked: false },
-      salesperson: { ops: 'View vehicle listings only (no cost or profit data)', blocked: false },
-      accountant:  { ops: 'View vehicle listings only (no cost or profit data)', blocked: false },
+      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Status · Costs · Documents · Website · Delete', blocked: false },
+      manager:     { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Status changes · Costs · Documents · Website · Delete', blocked: false },
+      salesperson: { crud: ['READ'], ops: 'View vehicle listings only (no cost or profit data)', blocked: false },
+      accountant:  { crud: ['READ'], ops: 'View vehicle listings only (no cost or profit data)', blocked: false },
     },
     flags: [
       {
@@ -121,10 +131,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'crm', label: 'CRM', icon: '🎯',
     roleAccess: {
-      admin:       { ops: 'View all · Create · Edit · Update status · Reassign · Delete leads', blocked: false },
-      manager:     { ops: 'View all · Create · Edit · Update status · Reassign · Delete leads', blocked: false },
-      salesperson: { ops: 'View own assigned leads · Create · Edit · Update pipeline status', blocked: false },
-      accountant:  { ops: 'View all leads · Create · Edit · Update pipeline status', blocked: false },
+      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View all · Create · Edit · Update status · Reassign · Delete leads', blocked: false },
+      manager:     { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View all · Create · Edit · Update status · Reassign · Delete leads', blocked: false },
+      salesperson: { crud: ['READ','CREATE','EDIT'], ops: 'View own assigned leads · Create · Edit · Update pipeline status', blocked: false },
+      accountant:  { crud: ['READ','CREATE','EDIT'], ops: 'View all leads · Create · Edit · Update pipeline status', blocked: false },
     },
     flags: [],
     // No flags — CRM reassign & delete are gated by role, not permission flags
@@ -139,10 +149,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'deals', label: 'Deals', icon: '🤝',
     roleAccess: {
-      admin:       { ops: 'View · Create · Edit · Payments · Finance · Trade-in · Delivery · Complete · Cancel · Delete', blocked: false },
-      manager:     { ops: 'View · Create · Edit · Payments · Finance · Trade-in · Delivery · Complete · Delete', blocked: false },
-      salesperson: { ops: 'View · Create · Edit · Add Payments · Finance details · Trade-in · Update Delivery', blocked: false },
-      accountant:  { ops: 'View · Edit · Add Payments · Finance · Trade-in · Delivery updates', blocked: false },
+      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Payments · Finance · Trade-in · Delivery · Complete · Cancel · Delete', blocked: false },
+      manager:     { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Payments · Finance · Trade-in · Delivery · Complete · Delete', blocked: false },
+      salesperson: { crud: ['READ','CREATE','EDIT'], ops: 'View · Create · Edit · Add Payments · Finance details · Trade-in · Update Delivery', blocked: false },
+      accountant:  { crud: ['READ','EDIT'], ops: 'View · Edit · Add Payments · Finance · Trade-in · Delivery updates', blocked: false },
     },
     flags: [
       {
@@ -177,10 +187,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'customers', label: 'Customers', icon: '👥',
     roleAccess: {
-      admin:       { ops: 'View · Create · Edit · Notes · Blacklist · Remove Blacklist · Delete', blocked: false },
-      manager:     { ops: 'View · Create · Edit · Add / Delete notes', blocked: false },
-      salesperson: { ops: 'View · Create · Edit · Add / Delete notes', blocked: false },
-      accountant:  { ops: 'View · Create · Edit · Add / Delete notes', blocked: false },
+      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Notes · Blacklist · Remove Blacklist · Delete', blocked: false },
+      manager:     { crud: ['READ','CREATE','EDIT'], ops: 'View · Create · Edit · Add / Delete notes', blocked: false },
+      salesperson: { crud: ['READ','CREATE','EDIT'], ops: 'View · Create · Edit · Add / Delete notes', blocked: false },
+      accountant:  { crud: ['READ','CREATE','EDIT'], ops: 'View · Create · Edit · Add / Delete notes', blocked: false },
     },
     flags: [
       {
@@ -208,10 +218,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'commissions', label: 'Commissions', icon: '💸',
     roleAccess: {
-      admin:       { ops: 'View all · Mark paid · Override amounts · View stats', blocked: false },
-      manager:     { ops: 'View all commissions · Mark paid · View stats', blocked: false },
-      salesperson: { ops: 'View own commissions only', blocked: false },
-      accountant:  { ops: 'View all commissions · View stats', blocked: false },
+      admin:       { crud: ['READ','EDIT'], ops: 'View all · Mark paid · Override amounts · View stats', blocked: false },
+      manager:     { crud: ['READ','EDIT'], ops: 'View all commissions · Mark paid · View stats', blocked: false },
+      salesperson: { crud: ['READ'], ops: 'View own commissions only', blocked: false },
+      accountant:  { crud: ['READ'], ops: 'View all commissions · View stats', blocked: false },
     },
     flags: [],
   },
@@ -222,10 +232,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'expenses', label: 'Expenses', icon: '💳',
     roleAccess: {
-      admin:       { ops: 'View · Create · Edit · Delete expenses', blocked: false },
-      manager:     { ops: 'View · Create · Edit expenses (delete is admin only)', blocked: false },
-      salesperson: { ops: 'No access — blocked at API level by role', blocked: true },
-      accountant:  { ops: 'No access — blocked at API level by role', blocked: true },
+      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Delete expenses', blocked: false },
+      manager:     { crud: ['READ','CREATE','EDIT'], ops: 'View · Create · Edit expenses (delete is admin only)', blocked: false },
+      salesperson: { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
+      accountant:  { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
     },
     flags: [],
   },
@@ -238,10 +248,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'employees', label: 'Employees', icon: '👤',
     roleAccess: {
-      admin:       { ops: 'View all · Create · Edit · Set Permissions · Commission · Status · Reset Auth · Delete', blocked: false },
-      manager:     { ops: 'View all employee profiles · View own performance', blocked: false },
-      salesperson: { ops: 'View own profile and performance only', blocked: false },
-      accountant:  { ops: 'View own profile and performance only', blocked: false },
+      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View all · Create · Edit · Set Permissions · Commission · Status · Reset Auth · Delete', blocked: false },
+      manager:     { crud: ['READ'], ops: 'View all employee profiles · View own performance', blocked: false },
+      salesperson: { crud: ['READ'], ops: 'View own profile and performance only', blocked: false },
+      accountant:  { crud: ['READ'], ops: 'View own profile and performance only', blocked: false },
     },
     flags: [
       {
@@ -261,10 +271,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'reports', label: 'Reports', icon: '📈',
     roleAccess: {
-      admin:       { ops: 'All reports · Inventory · CRM · Sales · Customers · Employees · Commissions · Expenses · Export all', blocked: false },
-      manager:     { ops: 'All reports · Export PDF / Excel / CSV', blocked: false },
-      salesperson: { ops: 'No access — blocked at API level by role', blocked: true },
-      accountant:  { ops: 'No access — blocked at API level by role', blocked: true },
+      admin:       { crud: ['READ'], ops: 'All reports · Inventory · CRM · Sales · Customers · Employees · Commissions · Expenses · Export all', blocked: false },
+      manager:     { crud: ['READ'], ops: 'All reports · Export PDF / Excel / CSV', blocked: false },
+      salesperson: { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
+      accountant:  { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
     },
     flags: [
       {
@@ -297,10 +307,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'trash', label: 'Trash', icon: '🗑️',
     roleAccess: {
-      admin:       { ops: 'View deleted records · Restore · Permanently delete', blocked: false },
-      manager:     { ops: 'View deleted records only (restore & permanent delete require Admin)', blocked: false },
-      salesperson: { ops: 'No access — blocked at API level by role', blocked: true },
-      accountant:  { ops: 'No access — blocked at API level by role', blocked: true },
+      admin:       { crud: ['READ','DELETE'], ops: 'View deleted records · Restore · Permanently delete', blocked: false },
+      manager:     { crud: ['READ'], ops: 'View deleted records only (restore & permanent delete require Admin)', blocked: false },
+      salesperson: { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
+      accountant:  { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
     },
     flags: [],
   },
@@ -312,10 +322,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'audit', label: 'Audit Log', icon: '🔍',
     roleAccess: {
-      admin:       { ops: 'View full log · Search & filter · Verify chain integrity', blocked: false },
-      manager:     { ops: 'View full audit log · Search & filter', blocked: false },
-      salesperson: { ops: 'No access — blocked at API level by role', blocked: true },
-      accountant:  { ops: 'No access — blocked at API level by role', blocked: true },
+      admin:       { crud: ['READ'], ops: 'View full log · Search & filter · Verify chain integrity', blocked: false },
+      manager:     { crud: ['READ'], ops: 'View full audit log · Search & filter', blocked: false },
+      salesperson: { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
+      accountant:  { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
     },
     flags: [
       {
@@ -335,10 +345,10 @@ const NAV_MODULES: NavModule[] = [
   {
     id: 'backups', label: 'Backups', icon: '💾',
     roleAccess: {
-      admin:       { ops: 'View · Stats · Trigger manual backup · Download · Delete backup records', blocked: false },
-      manager:     { ops: 'View backup history · View stats (trigger & delete require Admin)', blocked: false },
-      salesperson: { ops: 'No access — blocked at API level by role', blocked: true },
-      accountant:  { ops: 'No access — blocked at API level by role', blocked: true },
+      admin:       { crud: ['READ','CREATE','DELETE'], ops: 'View · Stats · Trigger manual backup · Download · Delete backup records', blocked: false },
+      manager:     { crud: ['READ'], ops: 'View backup history · View stats (trigger & delete require Admin)', blocked: false },
+      salesperson: { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
+      accountant:  { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
     },
     flags: [
       {
@@ -430,70 +440,110 @@ function ModuleCard({
 }) {
   const [open, setOpen] = useState(false);
 
-  const roleEntry = mod.roleAccess[role] ?? mod.roleAccess['admin']!;
-  const isBlocked  = roleEntry.blocked;
-  const hasFlags   = mod.flags.length > 0;
+  const roleEntry   = mod.roleAccess[role] ?? mod.roleAccess['admin']!;
+  const isBlocked   = roleEntry.blocked;
+  const hasFlags    = mod.flags.length > 0;
   const activeCount = mod.flags.filter(f => perms[f.key]).length;
   const anyActive   = activeCount > 0;
 
+  const ALL_OPS: CrudOp[] = ['READ', 'CREATE', 'EDIT', 'DELETE'];
+
   return (
     <div style={{
-      border: `1px solid ${anyActive ? 'rgba(249,115,22,0.4)' : isBlocked ? 'rgba(239,68,68,0.2)' : t.border}`,
+      border: `1px solid ${isBlocked ? 'rgba(239,68,68,0.22)' : anyActive ? 'rgba(249,115,22,0.4)' : t.border}`,
       borderRadius: 12, background: t.card, overflow: 'hidden', transition: 'border-color .15s',
     }}>
       {/* ── Module header ── */}
       <div
-        onClick={e => { e.stopPropagation(); if (hasFlags) setOpen(v => !v); }}
+        onClick={e => { e.stopPropagation(); if (hasFlags && !isBlocked) setOpen(v => !v); }}
         style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '12px 14px',
-          cursor: hasFlags ? 'pointer' : 'default',
-          background: anyActive ? 'rgba(249,115,22,0.04)' : isBlocked ? 'rgba(239,68,68,0.03)' : 'transparent',
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+          padding: '11px 13px',
+          cursor: (hasFlags && !isBlocked) ? 'pointer' : 'default',
+          background: isBlocked ? 'rgba(239,68,68,0.04)' : anyActive ? 'rgba(249,115,22,0.04)' : 'transparent',
           borderBottom: open ? `1px solid ${t.border}` : 'none',
           userSelect: 'none',
         }}
       >
-        <span style={{ fontSize: 17, lineHeight: 1, flexShrink: 0 }}>{mod.icon}</span>
+        <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0, marginTop: 2 }}>{mod.icon}</span>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Module name */}
-          <div style={{ fontSize: 13, fontWeight: 700, color: anyActive ? '#f97316' : isBlocked ? 'rgba(239,68,68,0.8)' : t.text }}>
-            {mod.label}
+          {/* Top row: name + CRUD badges */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 5 }}>
+            <span style={{
+              fontSize: 13, fontWeight: 700,
+              color: isBlocked ? 'rgba(239,68,68,0.8)' : anyActive ? '#f97316' : t.text,
+            }}>
+              {mod.label}
+            </span>
+
+            {/* ── CRUD badges ── */}
+            {isBlocked ? (
+              /* NO ACCESS pill */
+              <span style={{
+                fontSize: 9, fontWeight: 800, letterSpacing: '.06em',
+                padding: '2px 7px', borderRadius: 4,
+                color: '#ef4444', background: 'rgba(239,68,68,0.13)',
+                border: '1px solid rgba(239,68,68,0.3)',
+              }}>
+                🔒 NO ACCESS
+              </span>
+            ) : (
+              ALL_OPS.map(op => {
+                const has = roleEntry.crud.includes(op);
+                const cc  = CRUD_COLORS[op];
+                return (
+                  <span key={op} style={{
+                    fontSize: 9, fontWeight: 800, letterSpacing: '.05em',
+                    padding: '2px 6px', borderRadius: 3,
+                    color:      has ? cc.color : 'rgba(128,128,128,0.35)',
+                    background: has ? cc.bg    : 'transparent',
+                    border:    `1px solid ${has ? cc.border : 'rgba(128,128,128,0.1)'}`,
+                    opacity: has ? 1 : 0.38,
+                    textDecoration: 'none',
+                  }}>
+                    {op}
+                  </span>
+                );
+              })
+            )}
+
+            {/* flag count badge */}
+            {hasFlags && !isBlocked && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+                background: anyActive ? 'rgba(249,115,22,0.15)' : 'rgba(128,128,128,0.09)',
+                color: anyActive ? '#f97316' : t.muted,
+                border: `1px solid ${anyActive ? 'rgba(249,115,22,0.3)' : 'transparent'}`,
+                marginLeft: 2,
+              }}>
+                {activeCount}/{mod.flags.length} flags
+              </span>
+            )}
           </div>
-          {/* Role access description */}
+
+          {/* ops description */}
           <div style={{
-            fontSize: 11, marginTop: 2, lineHeight: 1.4,
-            color: isBlocked ? 'rgba(239,68,68,0.65)' : 'rgba(52,211,153,0.85)',
-            display: 'flex', alignItems: 'flex-start', gap: 4,
+            fontSize: 11, lineHeight: 1.4,
+            color: isBlocked ? 'rgba(239,68,68,0.6)' : t.muted,
           }}>
-            <span style={{ flexShrink: 0, marginTop: 1 }}>{isBlocked ? '🔒' : '✓'}</span>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{roleEntry.ops}</span>
+            {roleEntry.ops}
           </div>
         </div>
 
-        {/* Flag count badge */}
-        {hasFlags && (
+        {/* Expand arrow (only if has flags and not blocked) */}
+        {hasFlags && !isBlocked && (
           <span style={{
-            fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, flexShrink: 0,
-            background: anyActive ? 'rgba(249,115,22,0.15)' : 'rgba(128,128,128,0.1)',
-            color: anyActive ? '#f97316' : t.muted,
-            border: `1px solid ${anyActive ? 'rgba(249,115,22,0.3)' : 'transparent'}`,
-          }}>
-            {activeCount}/{mod.flags.length}
-          </span>
-        )}
-
-        {/* Expand / no-flags indicator */}
-        {hasFlags ? (
-          <span style={{ color: t.muted, fontSize: 10, transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none', flexShrink: 0 }}>▼</span>
-        ) : (
-          <span style={{ fontSize: 10, color: t.muted, whiteSpace: 'nowrap', flexShrink: 0 }}>no extra flags</span>
+            color: t.muted, fontSize: 10, flexShrink: 0,
+            transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none',
+            marginTop: 4,
+          }}>▼</span>
         )}
       </div>
 
       {/* ── Flag rows (expanded) ── */}
-      {open && hasFlags && (
-        <div onClick={e => e.stopPropagation()} style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+      {open && hasFlags && !isBlocked && (
+        <div onClick={e => e.stopPropagation()} style={{ padding: '9px 11px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {mod.flags.map(flag => {
             const tc     = TAG_COLORS[flag.tag]!;
             const active = perms[flag.key] ?? false;
@@ -522,7 +572,6 @@ function ModuleCard({
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: active ? '#f97316' : t.text }}>{flag.label}</span>
-                    {/* API enforced badge */}
                     <span style={{
                       fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
                       background: flag.apiEnforced ? 'rgba(52,211,153,0.1)' : 'rgba(148,174,200,0.15)',
