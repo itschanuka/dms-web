@@ -47,15 +47,16 @@ const ROLE_CFG: Record<string, { color: string; bg: string; border: string }> = 
 //   - Frontend-only gate   → flag only controls UI visibility (marked ★ UI)
 // ─────────────────────────────────────────────────────────────────────────────
 
-type FlagTag = 'VIEW' | 'CREATE' | 'EDIT' | 'DELETE' | 'EXPORT' | 'ACTION';
-
-interface PermFlag {
-  key: string;
-  label: string;
-  desc: string;
-  tag: FlagTag;
-  apiEnforced: boolean; // true = API actually checks the flag, false = UI-only gate
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// CRUD FLAG DEFINITIONS
+//
+// Each module defines exactly which CRUD operations exist in its UI + API.
+// crudFlags maps each CrudOp → the DB permission column key.
+// extraFlags are legacy/special flags that still apply to the module.
+//
+// Admin role ALWAYS bypasses all flag checks.
+// Non-admin: flag must be true for that operation to be allowed.
+// ─────────────────────────────────────────────────────────────────────────────
 
 type CrudOp = 'READ' | 'CREATE' | 'EDIT' | 'DELETE';
 
@@ -66,305 +67,272 @@ const CRUD_COLORS: Record<CrudOp, { color: string; bg: string; border: string }>
   DELETE: { color: '#ef4444', bg: 'rgba(239,68,68,0.13)',   border: 'rgba(239,68,68,0.28)'   },
 };
 
-interface RoleEntry {
-  crud: CrudOp[];    // which CRUD operations this role has
-  ops: string;       // human-readable description
-  blocked: boolean;  // true = role is completely blocked from this module
+interface CrudFlagDef {
+  op:          CrudOp;
+  key:         string;   // DB column name in employee_permissions
+  desc:        string;   // tooltip / description
+  roleDefault: string[]; // roles that have this by default (for display reference)
+}
+
+interface ExtraFlag {
+  key:         string;
+  label:       string;
+  desc:        string;
+  apiEnforced: boolean;
 }
 
 interface NavModule {
-  id: string;
-  label: string;
-  icon: string;
-  roleAccess: Record<string, RoleEntry>;
-  flags: PermFlag[];
+  id:         string;
+  label:      string;
+  icon:       string;
+  crudFlags:  CrudFlagDef[];   // the actual CRUD permission toggles
+  extraFlags: ExtraFlag[];     // legacy / special-purpose flags for this module
+  roleNote:   Record<string, string>; // short role-specific description
+  blockedFor: string[];        // roles blocked entirely at API level (no flags possible)
 }
 
 const NAV_MODULES: NavModule[] = [
-  // ── DASHBOARD ──────────────────────────────────────────────
-  // No route guard — all authenticated roles access dashboard
+  // ── DASHBOARD ──────────────────────────────────────────────────────────────
   {
     id: 'dashboard', label: 'Dashboard', icon: '📊',
-    roleAccess: {
-      admin:       { crud: ['READ'], ops: 'Full stats · Revenue · Inventory · Deal pipeline', blocked: false },
-      manager:     { crud: ['READ'], ops: 'Full stats · Revenue · Inventory · Deal pipeline', blocked: false },
-      salesperson: { crud: ['READ'], ops: 'Own activity · Assigned leads · Own deals', blocked: false },
-      accountant:  { crud: ['READ'], ops: 'Summary stats · Revenue overview', blocked: false },
+    crudFlags: [
+      { op: 'READ', key: 'dashboard_read', desc: 'Access the dashboard page and view stats', roleDefault: ['manager','salesperson','accountant'] },
+    ],
+    extraFlags: [],
+    roleNote: {
+      admin:       'Full stats — revenue, inventory, deal pipeline',
+      manager:     'Full stats — revenue, inventory, deal pipeline',
+      salesperson: 'Own activity — assigned leads and own deals only',
+      accountant:  'Summary stats — revenue overview',
     },
-    flags: [],
+    blockedFor: [],
   },
 
-  // ── INVENTORY ──────────────────────────────────────────────
-  // GET / and GET /:id → all roles
-  // POST, PUT, PATCH status, PATCH website, DELETE, costs, docs → requireRole('manager','admin')
-  // edit_price → service-level flag check
-  // view_profit → shows purchase cost & min price (manager+ by default in service)
+  // ── INVENTORY ──────────────────────────────────────────────────────────────
   {
     id: 'inventory', label: 'Inventory', icon: '🚗',
-    roleAccess: {
-      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Status · Costs · Documents · Website · Delete', blocked: false },
-      manager:     { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Status changes · Costs · Documents · Website · Delete', blocked: false },
-      salesperson: { crud: ['READ'], ops: 'View vehicle listings only (no cost or profit data)', blocked: false },
-      accountant:  { crud: ['READ'], ops: 'View vehicle listings only (no cost or profit data)', blocked: false },
-    },
-    flags: [
-      {
-        key: 'edit_price',
-        label: 'Edit Asking / Min Price',
-        desc: 'Change the asking price and minimum acceptable price on any vehicle',
-        tag: 'EDIT',
-        apiEnforced: true,
-      },
-      {
-        key: 'view_profit',
-        label: 'View Cost & Profit Data',
-        desc: 'See purchase cost, repair costs, minimum price and profit margin on vehicles',
-        tag: 'VIEW',
-        apiEnforced: true,
-      },
+    crudFlags: [
+      { op: 'READ',   key: 'inventory_read',   desc: 'View vehicle listings, details, documents', roleDefault: ['manager','salesperson','accountant'] },
+      { op: 'CREATE', key: 'inventory_create', desc: 'Add new vehicles to inventory',             roleDefault: ['manager'] },
+      { op: 'EDIT',   key: 'inventory_edit',   desc: 'Edit vehicle details, status, costs, documents, website toggle', roleDefault: ['manager'] },
+      { op: 'DELETE', key: 'inventory_delete', desc: 'Soft-delete vehicles (moves to Trash)',     roleDefault: ['manager'] },
     ],
+    extraFlags: [
+      { key: 'edit_price',  label: 'Edit Asking / Min Price', desc: 'Change asking price and minimum acceptable price — API enforced', apiEnforced: true },
+      { key: 'view_profit', label: 'View Cost & Profit Data', desc: 'See purchase cost, repair costs and profit margin — API enforced', apiEnforced: true },
+    ],
+    roleNote: {
+      admin:       'Full access — all CRUD + costs + documents + website',
+      manager:     'Full access — all CRUD + costs + documents + website',
+      salesperson: 'View listings only — no cost or profit data by default',
+      accountant:  'View listings only — no cost or profit data by default',
+    },
+    blockedFor: [],
   },
 
-  // ── CRM ────────────────────────────────────────────────────
-  // GET, POST, PUT, PATCH status → all roles (service filters salesperson to own leads)
-  // PATCH assign, DELETE → requireRole('manager','admin')  — NOT a flag, pure role
+  // ── CRM ────────────────────────────────────────────────────────────────────
   {
     id: 'crm', label: 'CRM', icon: '🎯',
-    roleAccess: {
-      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View all · Create · Edit · Update status · Reassign · Delete leads', blocked: false },
-      manager:     { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View all · Create · Edit · Update status · Reassign · Delete leads', blocked: false },
-      salesperson: { crud: ['READ','CREATE','EDIT'], ops: 'View own assigned leads · Create · Edit · Update pipeline status', blocked: false },
-      accountant:  { crud: ['READ','CREATE','EDIT'], ops: 'View all leads · Create · Edit · Update pipeline status', blocked: false },
+    crudFlags: [
+      { op: 'READ',   key: 'crm_read',   desc: 'View leads and follow-up history',       roleDefault: ['manager','salesperson','accountant'] },
+      { op: 'CREATE', key: 'crm_create', desc: 'Create new leads',                        roleDefault: ['manager','salesperson','accountant'] },
+      { op: 'EDIT',   key: 'crm_edit',   desc: 'Edit leads, update status, add follow-ups', roleDefault: ['manager','salesperson','accountant'] },
+      { op: 'DELETE', key: 'crm_delete', desc: 'Soft-delete leads (moves to Trash) — also requires Manager+ role', roleDefault: ['manager'] },
+    ],
+    extraFlags: [],
+    roleNote: {
+      admin:       'Full access — view all, create, edit, reassign, delete',
+      manager:     'Full access — view all, create, edit, reassign, delete',
+      salesperson: 'View own assigned leads, create, edit, update status',
+      accountant:  'View all leads, create, edit, update status',
     },
-    flags: [],
-    // No flags — CRM reassign & delete are gated by role, not permission flags
+    blockedFor: [],
   },
 
-  // ── DEALS ──────────────────────────────────────────────────
-  // GET, POST, PUT, payments, finance, trade-in, delivery → all roles (no guard)
-  // PATCH complete, DELETE → requireRole('manager','admin')
-  // PATCH discount → requirePermission('approve_discount')  ★ API
-  // PATCH cancel → requirePermission('cancel_deal')  ★ API
-  // GET /:id/profit → requirePermission('view_profit')  ★ API
+  // ── DEALS ──────────────────────────────────────────────────────────────────
   {
     id: 'deals', label: 'Deals', icon: '🤝',
-    roleAccess: {
-      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Payments · Finance · Trade-in · Delivery · Complete · Cancel · Delete', blocked: false },
-      manager:     { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Payments · Finance · Trade-in · Delivery · Complete · Delete', blocked: false },
-      salesperson: { crud: ['READ','CREATE','EDIT'], ops: 'View · Create · Edit · Add Payments · Finance details · Trade-in · Update Delivery', blocked: false },
-      accountant:  { crud: ['READ','EDIT'], ops: 'View · Edit · Add Payments · Finance · Trade-in · Delivery updates', blocked: false },
-    },
-    flags: [
-      {
-        key: 'approve_discount',
-        label: 'Apply Discount',
-        desc: 'Apply a discount amount to any deal — enforced at API level',
-        tag: 'ACTION',
-        apiEnforced: true,
-      },
-      {
-        key: 'cancel_deal',
-        label: 'Cancel Deal',
-        desc: 'Cancel active or reserved deals — enforced at API level',
-        tag: 'ACTION',
-        apiEnforced: true,
-      },
-      {
-        key: 'view_profit',
-        label: 'View Profit Breakdown',
-        desc: 'Access the profit endpoint — see gross/net profit on each deal — API enforced',
-        tag: 'VIEW',
-        apiEnforced: true,
-      },
+    crudFlags: [
+      { op: 'READ',   key: 'deals_read',   desc: 'View deals, payments, finance, trade-in, delivery', roleDefault: ['manager','salesperson','accountant'] },
+      { op: 'CREATE', key: 'deals_create', desc: 'Create new deals',                                   roleDefault: ['manager','salesperson'] },
+      { op: 'EDIT',   key: 'deals_edit',   desc: 'Edit deals, add payments, update finance / trade-in / delivery', roleDefault: ['manager','salesperson','accountant'] },
+      { op: 'DELETE', key: 'deals_delete', desc: 'Soft-delete deals — also requires Manager+ role',    roleDefault: ['manager'] },
     ],
+    extraFlags: [
+      { key: 'approve_discount', label: 'Apply Discount',      desc: 'Apply a discount amount to a deal — API enforced',      apiEnforced: true },
+      { key: 'cancel_deal',      label: 'Cancel Deal',         desc: 'Cancel active or reserved deals — API enforced',         apiEnforced: true },
+      { key: 'view_profit',      label: 'View Profit Breakdown', desc: 'Access gross/net profit on each deal — API enforced', apiEnforced: true },
+    ],
+    roleNote: {
+      admin:       'Full access — create, edit, complete, cancel, delete',
+      manager:     'Full access — create, edit, complete, delete (cancel needs flag)',
+      salesperson: 'Create, edit, payments, finance, trade-in, delivery (no complete/delete)',
+      accountant:  'View and edit payments/finance — cannot create or delete',
+    },
+    blockedFor: [],
   },
 
-  // ── CUSTOMERS ──────────────────────────────────────────────
-  // GET, POST, PUT, notes → all roles
-  // PATCH blacklist → requirePermission('blacklist_customer')  ★ API
-  // PATCH remove-blacklist → requireRole('admin')
-  // DELETE /:id → requirePermission('delete_records')  ★ API
+  // ── CUSTOMERS ──────────────────────────────────────────────────────────────
   {
     id: 'customers', label: 'Customers', icon: '👥',
-    roleAccess: {
-      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Notes · Blacklist · Remove Blacklist · Delete', blocked: false },
-      manager:     { crud: ['READ','CREATE','EDIT'], ops: 'View · Create · Edit · Add / Delete notes', blocked: false },
-      salesperson: { crud: ['READ','CREATE','EDIT'], ops: 'View · Create · Edit · Add / Delete notes', blocked: false },
-      accountant:  { crud: ['READ','CREATE','EDIT'], ops: 'View · Create · Edit · Add / Delete notes', blocked: false },
-    },
-    flags: [
-      {
-        key: 'blacklist_customer',
-        label: 'Blacklist Customer',
-        desc: 'Mark customers as blacklisted with a reason — enforced at API level',
-        tag: 'ACTION',
-        apiEnforced: true,
-      },
-      {
-        key: 'delete_records',
-        label: 'Delete Customer Records',
-        desc: 'Soft-delete customer records (moves to Trash) — enforced at API level',
-        tag: 'DELETE',
-        apiEnforced: true,
-      },
+    crudFlags: [
+      { op: 'READ',   key: 'customers_read',   desc: 'View customer profiles, notes, deal history', roleDefault: ['manager','salesperson','accountant'] },
+      { op: 'CREATE', key: 'customers_create', desc: 'Create new customer records',                  roleDefault: ['manager','salesperson','accountant'] },
+      { op: 'EDIT',   key: 'customers_edit',   desc: 'Edit customer details and manage notes',       roleDefault: ['manager','salesperson','accountant'] },
+      { op: 'DELETE', key: 'customers_delete', desc: 'Soft-delete customers — also requires delete_records flag', roleDefault: [] },
     ],
+    extraFlags: [
+      { key: 'blacklist_customer', label: 'Blacklist Customer',      desc: 'Mark customers as blacklisted — API enforced', apiEnforced: true },
+      { key: 'delete_records',     label: 'Delete Customer Records', desc: 'Soft-delete customer records (moves to Trash) — API enforced', apiEnforced: true },
+    ],
+    roleNote: {
+      admin:       'Full access — create, edit, blacklist, remove blacklist, delete',
+      manager:     'Create, edit, manage notes — blacklist needs flag',
+      salesperson: 'Create, edit, manage notes — blacklist needs flag',
+      accountant:  'Create, edit, manage notes — blacklist needs flag',
+    },
+    blockedFor: [],
   },
 
-  // ── COMMISSIONS ────────────────────────────────────────────
-  // GET list/detail/summary/stats → all roles (service restricts salesperson to own)
-  // PATCH mark-paid → requireRole('admin','manager')
-  // PATCH override → requireRole('admin')
-  // No permission flags — all access is role-based
+  // ── COMMISSIONS ────────────────────────────────────────────────────────────
   {
     id: 'commissions', label: 'Commissions', icon: '💸',
-    roleAccess: {
-      admin:       { crud: ['READ','EDIT'], ops: 'View all · Mark paid · Override amounts · View stats', blocked: false },
-      manager:     { crud: ['READ','EDIT'], ops: 'View all commissions · Mark paid · View stats', blocked: false },
-      salesperson: { crud: ['READ'], ops: 'View own commissions only', blocked: false },
-      accountant:  { crud: ['READ'], ops: 'View all commissions · View stats', blocked: false },
+    crudFlags: [
+      { op: 'READ', key: 'commissions_read', desc: 'View commissions, stats, summaries', roleDefault: ['manager','salesperson','accountant'] },
+      { op: 'EDIT', key: 'commissions_edit', desc: 'Mark commissions as paid or override amounts — also requires Manager+ role', roleDefault: ['manager'] },
+    ],
+    extraFlags: [],
+    roleNote: {
+      admin:       'View all · Mark paid · Override amounts · View stats',
+      manager:     'View all · Mark paid · View stats',
+      salesperson: 'View own commissions only',
+      accountant:  'View all commissions · View stats',
     },
-    flags: [],
+    blockedFor: [],
   },
 
-  // ── EXPENSES ───────────────────────────────────────────────
-  // router.use(requireRole('manager','admin')) — salesperson & accountant FULLY BLOCKED
-  // DELETE /:id → requireRole('admin') within that
+  // ── EXPENSES ───────────────────────────────────────────────────────────────
+  // router.use(requireRole('manager','admin')) blocks salesperson & accountant entirely
   {
     id: 'expenses', label: 'Expenses', icon: '💳',
-    roleAccess: {
-      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View · Create · Edit · Delete expenses', blocked: false },
-      manager:     { crud: ['READ','CREATE','EDIT'], ops: 'View · Create · Edit expenses (delete is admin only)', blocked: false },
-      salesperson: { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
-      accountant:  { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
+    crudFlags: [
+      { op: 'READ',   key: 'expenses_read',   desc: 'View expense records and totals', roleDefault: ['manager'] },
+      { op: 'CREATE', key: 'expenses_create', desc: 'Create new expense records',      roleDefault: ['manager'] },
+      { op: 'EDIT',   key: 'expenses_edit',   desc: 'Edit existing expense records',   roleDefault: ['manager'] },
+      { op: 'DELETE', key: 'expenses_delete', desc: 'Delete expense records — also requires Admin role', roleDefault: [] },
+    ],
+    extraFlags: [],
+    roleNote: {
+      admin:       'Full access — create, edit, delete',
+      manager:     'Create and edit — delete requires Admin',
+      salesperson: 'No access — blocked at API level',
+      accountant:  'No access — blocked at API level',
     },
-    flags: [],
+    blockedFor: ['salesperson', 'accountant'],
   },
 
-  // ── EMPLOYEES ──────────────────────────────────────────────
-  // GET /:id → all roles (own profile OR manager+)
-  // GET / → requireRole('admin','manager')
-  // POST, PUT, PUT permissions, PUT commission, PATCH status, POST reset-auth, DELETE → requireRole('admin')
-  // manage_employees flag → frontend-only; API routes still enforce admin role
+  // ── EMPLOYEES ──────────────────────────────────────────────────────────────
   {
     id: 'employees', label: 'Employees', icon: '👤',
-    roleAccess: {
-      admin:       { crud: ['READ','CREATE','EDIT','DELETE'], ops: 'View all · Create · Edit · Set Permissions · Commission · Status · Reset Auth · Delete', blocked: false },
-      manager:     { crud: ['READ'], ops: 'View all employee profiles · View own performance', blocked: false },
-      salesperson: { crud: ['READ'], ops: 'View own profile and performance only', blocked: false },
-      accountant:  { crud: ['READ'], ops: 'View own profile and performance only', blocked: false },
-    },
-    flags: [
-      {
-        key: 'manage_employees',
-        label: 'Manage Employees (UI)',
-        desc: 'Show employee management controls in the UI — note: create/edit/delete routes still require Admin role at API level',
-        tag: 'ACTION',
-        apiEnforced: false,
-      },
+    crudFlags: [
+      { op: 'READ',   key: 'employees_read',   desc: 'View employee list and profiles',                    roleDefault: ['manager'] },
+      { op: 'CREATE', key: 'employees_create', desc: 'Create new employee accounts — also requires Admin role', roleDefault: [] },
+      { op: 'EDIT',   key: 'employees_edit',   desc: 'Edit profiles, permissions, commission, status — also requires Admin role', roleDefault: [] },
+      { op: 'DELETE', key: 'employees_delete', desc: 'Deactivate and remove employees — also requires Admin role', roleDefault: [] },
     ],
+    extraFlags: [
+      { key: 'manage_employees', label: 'Show Employee Management (UI only)', desc: 'Show create/edit controls in UI — API routes still require Admin role', apiEnforced: false },
+    ],
+    roleNote: {
+      admin:       'Full access — create, edit permissions, commission, status, delete',
+      manager:     'View all employee profiles and performance',
+      salesperson: 'View own profile and performance only',
+      accountant:  'View own profile and performance only',
+    },
+    blockedFor: [],
   },
 
-  // ── REPORTS ────────────────────────────────────────────────
+  // ── REPORTS ────────────────────────────────────────────────────────────────
   // ALL routes → requireRole('manager','admin')
-  // view_reports, export_reports → frontend-only (API still blocks non-manager)
-  // view_profit → used in report data to show/hide profit columns
   {
     id: 'reports', label: 'Reports', icon: '📈',
-    roleAccess: {
-      admin:       { crud: ['READ'], ops: 'All reports · Inventory · CRM · Sales · Customers · Employees · Commissions · Expenses · Export all', blocked: false },
-      manager:     { crud: ['READ'], ops: 'All reports · Export PDF / Excel / CSV', blocked: false },
-      salesperson: { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
-      accountant:  { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
-    },
-    flags: [
-      {
-        key: 'view_reports',
-        label: 'Show Reports in Nav (UI)',
-        desc: 'Show the Reports section in navigation for this employee — API still requires manager+ for actual data',
-        tag: 'VIEW',
-        apiEnforced: false,
-      },
-      {
-        key: 'export_reports',
-        label: 'Export Reports',
-        desc: 'Enable PDF / Excel / CSV export buttons on report pages',
-        tag: 'EXPORT',
-        apiEnforced: false,
-      },
-      {
-        key: 'view_profit',
-        label: 'Show Profit Columns',
-        desc: 'Include profit and margin columns in all report data (inventory, sales, deals)',
-        tag: 'VIEW',
-        apiEnforced: false,
-      },
+    crudFlags: [
+      { op: 'READ', key: 'reports_read', desc: 'Access the reports section — also requires Manager+ role at API', roleDefault: ['manager'] },
     ],
+    extraFlags: [
+      { key: 'view_reports',   label: 'Show Reports in Nav (UI only)', desc: 'Show Reports in the nav sidebar — API still requires Manager+ for data', apiEnforced: false },
+      { key: 'export_reports', label: 'Export Reports',                desc: 'Enable PDF / Excel / CSV export on report pages — API enforced',         apiEnforced: true  },
+      { key: 'view_profit',    label: 'Show Profit Columns',           desc: 'Include profit and margin columns in all report data',                    apiEnforced: false },
+    ],
+    roleNote: {
+      admin:       'All reports — inventory, CRM, sales, customers, employees, commissions, expenses',
+      manager:     'All reports — export PDF / Excel / CSV',
+      salesperson: 'No access — blocked at API level',
+      accountant:  'No access — blocked at API level',
+    },
+    blockedFor: ['salesperson', 'accountant'],
   },
 
-  // ── TRASH ──────────────────────────────────────────────────
-  // GET / → requireRole('manager','admin')
-  // PATCH restore, DELETE permanent → requireRole('admin')
+  // ── TRASH ──────────────────────────────────────────────────────────────────
   {
     id: 'trash', label: 'Trash', icon: '🗑️',
-    roleAccess: {
-      admin:       { crud: ['READ','DELETE'], ops: 'View deleted records · Restore · Permanently delete', blocked: false },
-      manager:     { crud: ['READ'], ops: 'View deleted records only (restore & permanent delete require Admin)', blocked: false },
-      salesperson: { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
-      accountant:  { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
+    crudFlags: [
+      { op: 'READ',   key: 'trash_read',   desc: 'View soft-deleted records — also requires Manager+ role',   roleDefault: ['manager'] },
+      { op: 'DELETE', key: 'trash_delete', desc: 'Restore or permanently delete records — also requires Admin role', roleDefault: [] },
+    ],
+    extraFlags: [],
+    roleNote: {
+      admin:       'View, restore, and permanently delete records',
+      manager:     'View deleted records only — restore & permanent delete require Admin',
+      salesperson: 'No access — blocked at API level',
+      accountant:  'No access — blocked at API level',
     },
-    flags: [],
+    blockedFor: ['salesperson', 'accountant'],
   },
 
-  // ── AUDIT LOG ──────────────────────────────────────────────
-  // router.use(requireRole('manager','admin'))
-  // GET /verify → requireRole('admin') within that
-  // audit_view flag → frontend-only nav gate for non-manager roles
+  // ── AUDIT LOG ──────────────────────────────────────────────────────────────
   {
     id: 'audit', label: 'Audit Log', icon: '🔍',
-    roleAccess: {
-      admin:       { crud: ['READ'], ops: 'View full log · Search & filter · Verify chain integrity', blocked: false },
-      manager:     { crud: ['READ'], ops: 'View full audit log · Search & filter', blocked: false },
-      salesperson: { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
-      accountant:  { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
-    },
-    flags: [
-      {
-        key: 'audit_view',
-        label: 'Show Audit Log in Nav (UI)',
-        desc: 'Show the Audit Log section in navigation — API still requires manager+ for actual data',
-        tag: 'VIEW',
-        apiEnforced: false,
-      },
+    crudFlags: [
+      { op: 'READ', key: 'audit_read', desc: 'View and search the audit log — also requires Manager+ role at API', roleDefault: ['manager'] },
     ],
+    extraFlags: [
+      { key: 'audit_view', label: 'Show Audit Log in Nav (UI only)', desc: 'Show Audit Log in navigation — API requires Manager+ for actual data', apiEnforced: false },
+    ],
+    roleNote: {
+      admin:       'Full log — search, filter, verify chain integrity',
+      manager:     'Full audit log — search and filter',
+      salesperson: 'No access — blocked at API level',
+      accountant:  'No access — blocked at API level',
+    },
+    blockedFor: ['salesperson', 'accountant'],
   },
 
-  // ── BACKUPS ────────────────────────────────────────────────
-  // router.use(requireRole('manager','admin')) — salesperson/accountant blocked
-  // GET /:id/download → admin OR permission backup_download  ★ API
-  // POST /trigger, DELETE /:id → requireRole('admin') within manager+ middleware
+  // ── BACKUPS ────────────────────────────────────────────────────────────────
   {
     id: 'backups', label: 'Backups', icon: '💾',
-    roleAccess: {
-      admin:       { crud: ['READ','CREATE','DELETE'], ops: 'View · Stats · Trigger manual backup · Download · Delete backup records', blocked: false },
-      manager:     { crud: ['READ'], ops: 'View backup history · View stats (trigger & delete require Admin)', blocked: false },
-      salesperson: { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
-      accountant:  { crud: [], ops: 'No access — blocked at API level by role', blocked: true },
-    },
-    flags: [
-      {
-        key: 'backup_download',
-        label: 'Download Backup Files',
-        desc: 'Download backup archive files — enforced at API level (works for manager role)',
-        tag: 'ACTION',
-        apiEnforced: true,
-      },
+    crudFlags: [
+      { op: 'READ',   key: 'backups_read',   desc: 'View backup history and stats — also requires Manager+ role', roleDefault: ['manager'] },
+      { op: 'CREATE', key: 'backups_create', desc: 'Trigger manual backups — also requires Admin role',            roleDefault: [] },
+      { op: 'DELETE', key: 'backups_delete', desc: 'Delete backup records — also requires Admin role',             roleDefault: [] },
     ],
+    extraFlags: [
+      { key: 'backup_download', label: 'Download Backup Files', desc: 'Download backup archive files — API enforced (works for Manager role)', apiEnforced: true },
+    ],
+    roleNote: {
+      admin:       'View, trigger, download, delete backup records',
+      manager:     'View history and stats — trigger & delete require Admin',
+      salesperson: 'No access — blocked at API level',
+      accountant:  'No access — blocked at API level',
+    },
+    blockedFor: ['salesperson', 'accountant'],
   },
 ];
 
 // ─────────────────────────────────────────────────────────────
-// Tag colour config
+// Tag colour config (for extra flags)
 // ─────────────────────────────────────────────────────────────
+type FlagTag = 'VIEW' | 'CREATE' | 'EDIT' | 'DELETE' | 'EXPORT' | 'ACTION';
 const TAG_COLORS: Record<FlagTag, { color: string; bg: string; border: string }> = {
   VIEW:   { color: '#38bdf8', bg: 'rgba(56,189,248,0.12)',   border: 'rgba(56,189,248,0.3)'  },
   CREATE: { color: '#34d399', bg: 'rgba(52,211,153,0.12)',   border: 'rgba(52,211,153,0.3)'  },
@@ -440,36 +408,37 @@ function ModuleCard({
 }) {
   const [open, setOpen] = useState(false);
 
-  const roleEntry   = mod.roleAccess[role] ?? mod.roleAccess['admin']!;
-  const isBlocked   = roleEntry.blocked;
-  const hasFlags    = mod.flags.length > 0;
-  const activeCount = mod.flags.filter(f => perms[f.key]).length;
+  const isBlocked   = mod.blockedFor.includes(role);
+  const allKeys     = [...mod.crudFlags.map(f => f.key), ...mod.extraFlags.map(f => f.key)];
+  const hasToggles  = allKeys.length > 0;
+  const activeCount = allKeys.filter(k => perms[k]).length;
   const anyActive   = activeCount > 0;
 
   const ALL_OPS: CrudOp[] = ['READ', 'CREATE', 'EDIT', 'DELETE'];
+  const moduleOps = mod.crudFlags.map(f => f.op);
 
   return (
     <div style={{
       border: `1px solid ${isBlocked ? 'rgba(239,68,68,0.22)' : anyActive ? 'rgba(249,115,22,0.4)' : t.border}`,
       borderRadius: 12, background: t.card, overflow: 'hidden', transition: 'border-color .15s',
     }}>
-      {/* ── Module header ── */}
+      {/* ── Header ── */}
       <div
-        onClick={e => { e.stopPropagation(); if (hasFlags && !isBlocked) setOpen(v => !v); }}
+        onClick={() => { if (hasToggles && !isBlocked) setOpen(v => !v); }}
         style={{
           display: 'flex', alignItems: 'flex-start', gap: 10,
           padding: '11px 13px',
-          cursor: (hasFlags && !isBlocked) ? 'pointer' : 'default',
+          cursor: (hasToggles && !isBlocked) ? 'pointer' : 'default',
           background: isBlocked ? 'rgba(239,68,68,0.04)' : anyActive ? 'rgba(249,115,22,0.04)' : 'transparent',
           borderBottom: open ? `1px solid ${t.border}` : 'none',
           userSelect: 'none',
         }}
       >
-        <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0, marginTop: 2 }}>{mod.icon}</span>
+        <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0, marginTop: 3 }}>{mod.icon}</span>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Top row: name + CRUD badges */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 5 }}>
+          {/* Name + CRUD indicator badges */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{
               fontSize: 13, fontWeight: 700,
               color: isBlocked ? 'rgba(239,68,68,0.8)' : anyActive ? '#f97316' : t.text,
@@ -477,118 +446,135 @@ function ModuleCard({
               {mod.label}
             </span>
 
-            {/* ── CRUD badges ── */}
             {isBlocked ? (
-              /* NO ACCESS pill */
               <span style={{
-                fontSize: 9, fontWeight: 800, letterSpacing: '.06em',
-                padding: '2px 7px', borderRadius: 4,
-                color: '#ef4444', background: 'rgba(239,68,68,0.13)',
-                border: '1px solid rgba(239,68,68,0.3)',
-              }}>
-                🔒 NO ACCESS
-              </span>
+                fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 4,
+                color: '#ef4444', background: 'rgba(239,68,68,0.13)', border: '1px solid rgba(239,68,68,0.3)',
+              }}>🔒 NO ACCESS</span>
             ) : (
               ALL_OPS.map(op => {
-                const has = roleEntry.crud.includes(op);
-                const cc  = CRUD_COLORS[op];
+                const def = mod.crudFlags.find(f => f.op === op);
+                if (!moduleOps.includes(op)) {
+                  return (
+                    <span key={op} style={{
+                      fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
+                      color: 'rgba(128,128,128,0.2)', border: '1px solid rgba(128,128,128,0.07)',
+                    }}>{op}</span>
+                  );
+                }
+                if (!def) return null;
+                const active = perms[def.key] ?? false;
+                const cc = CRUD_COLORS[op];
                 return (
                   <span key={op} style={{
-                    fontSize: 9, fontWeight: 800, letterSpacing: '.05em',
-                    padding: '2px 6px', borderRadius: 3,
-                    color:      has ? cc.color : 'rgba(128,128,128,0.35)',
-                    background: has ? cc.bg    : 'transparent',
-                    border:    `1px solid ${has ? cc.border : 'rgba(128,128,128,0.1)'}`,
-                    opacity: has ? 1 : 0.38,
-                    textDecoration: 'none',
-                  }}>
-                    {op}
-                  </span>
+                    fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 3,
+                    color:      active ? cc.color : 'rgba(128,128,128,0.4)',
+                    background: active ? cc.bg    : 'transparent',
+                    border:    `1px solid ${active ? cc.border : 'rgba(128,128,128,0.12)'}`,
+                  }}>{op}</span>
                 );
               })
             )}
 
-            {/* flag count badge */}
-            {hasFlags && !isBlocked && (
+            {!isBlocked && hasToggles && (
               <span style={{
-                fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
-                background: anyActive ? 'rgba(249,115,22,0.15)' : 'rgba(128,128,128,0.09)',
+                fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, marginLeft: 2,
+                background: anyActive ? 'rgba(249,115,22,0.14)' : 'rgba(128,128,128,0.08)',
                 color: anyActive ? '#f97316' : t.muted,
-                border: `1px solid ${anyActive ? 'rgba(249,115,22,0.3)' : 'transparent'}`,
-                marginLeft: 2,
+                border: `1px solid ${anyActive ? 'rgba(249,115,22,0.28)' : 'transparent'}`,
               }}>
-                {activeCount}/{mod.flags.length} flags
+                {activeCount}/{allKeys.length}
               </span>
             )}
           </div>
 
-          {/* ops description */}
-          <div style={{
-            fontSize: 11, lineHeight: 1.4,
-            color: isBlocked ? 'rgba(239,68,68,0.6)' : t.muted,
-          }}>
-            {roleEntry.ops}
+          {/* Role note */}
+          <div style={{ fontSize: 11, color: isBlocked ? 'rgba(239,68,68,0.6)' : t.muted, lineHeight: 1.4 }}>
+            {mod.roleNote[role] ?? mod.roleNote['admin']}
           </div>
         </div>
 
-        {/* Expand arrow (only if has flags and not blocked) */}
-        {hasFlags && !isBlocked && (
+        {hasToggles && !isBlocked && (
           <span style={{
-            color: t.muted, fontSize: 10, flexShrink: 0,
+            color: t.muted, fontSize: 10, flexShrink: 0, marginTop: 4,
             transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none',
-            marginTop: 4,
           }}>▼</span>
         )}
       </div>
 
-      {/* ── Flag rows (expanded) ── */}
-      {open && hasFlags && !isBlocked && (
+      {/* ── Toggle rows (expanded) ── */}
+      {open && !isBlocked && (
         <div onClick={e => e.stopPropagation()} style={{ padding: '9px 11px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {mod.flags.map(flag => {
-            const tc     = TAG_COLORS[flag.tag]!;
+
+          {/* CRUD flag rows */}
+          {mod.crudFlags.map(flag => {
             const active = perms[flag.key] ?? false;
+            const cc = CRUD_COLORS[flag.op];
             return (
               <div
                 key={flag.key}
                 onClick={() => canEdit && onChange(flag.key)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 9,
-                  padding: '8px 11px', borderRadius: 9,
+                  display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 9,
                   background: active ? 'rgba(249,115,22,0.07)' : t.card2,
                   border: `1px solid ${active ? 'rgba(249,115,22,0.28)' : t.border}`,
-                  cursor: canEdit ? 'pointer' : 'default',
-                  transition: 'all .14s',
+                  cursor: canEdit ? 'pointer' : 'default', transition: 'all .14s',
                 }}
               >
-                {/* Type tag */}
                 <span style={{
-                  fontSize: 9, fontWeight: 800, letterSpacing: '.1em',
-                  padding: '2px 6px', borderRadius: 4, flexShrink: 0,
-                  color: tc.color, background: tc.bg, border: `1px solid ${tc.border}`,
-                  textTransform: 'uppercase',
-                }}>{flag.tag}</span>
+                  fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 4, flexShrink: 0,
+                  color: cc.color, background: cc.bg, border: `1px solid ${cc.border}`, letterSpacing: '.05em',
+                }}>{flag.op}</span>
 
-                {/* Label + description */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: active ? '#f97316' : t.text }}>{flag.label}</span>
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-                      background: flag.apiEnforced ? 'rgba(52,211,153,0.1)' : 'rgba(148,174,200,0.15)',
-                      color: flag.apiEnforced ? '#34d399' : t.muted,
-                      border: `1px solid ${flag.apiEnforced ? 'rgba(52,211,153,0.25)' : 'rgba(148,174,200,0.2)'}`,
-                      flexShrink: 0,
-                    }}>
-                      {flag.apiEnforced ? '★ API' : '★ UI'}
-                    </span>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#f97316' : t.text, marginBottom: 1 }}>
+                    {flag.op.charAt(0) + flag.op.slice(1).toLowerCase()} Access
                   </div>
-                  <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>{flag.desc}</div>
+                  <div style={{ fontSize: 11, color: t.muted, lineHeight: 1.35 }}>{flag.desc}</div>
                 </div>
 
                 <Toggle on={active} onChange={() => onChange(flag.key)} disabled={!canEdit} />
               </div>
             );
           })}
+
+          {/* Extra / special flags */}
+          {mod.extraFlags.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 700, color: t.muted, letterSpacing: '.06em', textTransform: 'uppercase', padding: '4px 2px 2px' }}>
+                Special Permissions
+              </div>
+              {mod.extraFlags.map(flag => {
+                const active = perms[flag.key] ?? false;
+                return (
+                  <div
+                    key={flag.key}
+                    onClick={() => canEdit && onChange(flag.key)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 9,
+                      background: active ? 'rgba(249,115,22,0.07)' : t.card2,
+                      border: `1px solid ${active ? 'rgba(249,115,22,0.28)' : t.border}`,
+                      cursor: canEdit ? 'pointer' : 'default', transition: 'all .14s',
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 1 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: active ? '#f97316' : t.text }}>{flag.label}</span>
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
+                          background: flag.apiEnforced ? 'rgba(52,211,153,0.1)' : 'rgba(148,174,200,0.15)',
+                          color: flag.apiEnforced ? '#34d399' : t.muted,
+                          border: `1px solid ${flag.apiEnforced ? 'rgba(52,211,153,0.25)' : 'rgba(148,174,200,0.2)'}`,
+                        }}>{flag.apiEnforced ? '★ API' : '★ UI'}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: t.muted, lineHeight: 1.35 }}>{flag.desc}</div>
+                    </div>
+                    <Toggle on={active} onChange={() => onChange(flag.key)} disabled={!canEdit} />
+                  </div>
+                );
+              })}
+            </>
+          )}
         </div>
       )}
     </div>
