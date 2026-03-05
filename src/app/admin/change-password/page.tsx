@@ -1,16 +1,34 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { changePassword } from '@/lib/auth';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
 
+  const [userEmail, setUserEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
+
+  // Grab the email from the live session on mount so we can pass it
+  // to changePassword() for re-auth after the password change kills
+  // the current session token.
+  useEffect(() => {
+    async function loadEmail() {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user?.email) {
+        setUserEmail(session.user.email);
+      }
+    }
+    void loadEmail();
+  }, []);
 
   const requirements = [
     { label: 'At least 8 characters', met: newPassword.length >= 8 },
@@ -29,13 +47,21 @@ export default function ChangePasswordPage() {
     setError('');
     setLoading(true);
 
-    const result = await changePassword(newPassword);
+    // Pass the email so changePassword() can re-sign-in after the Admin
+    // API nukes the session. Without this, mfa.enroll() on /setup-mfa
+    // throws "invalid claim: missing sub claim".
+    const result = await changePassword(newPassword, { email: userEmail });
 
     setLoading(false);
 
     if (result.success) {
-      // ✅ Your actual route exists here:
       router.push('/admin/setup-mfa');
+      return;
+    }
+
+    // If re-auth failed the session is fully dead — boot to login
+    if (result.error?.includes('re-authentication failed')) {
+      router.push('/admin/login');
       return;
     }
 
@@ -150,14 +176,21 @@ export default function ChangePasswordPage() {
               placeholder="••••••••"
               style={{
                 ...inputStyle,
-                borderColor: confirmPassword.length > 0 ? (doMatch ? '#10b981' : '#ef4444') : '#1f2d45',
+                borderColor:
+                  confirmPassword.length > 0
+                    ? doMatch
+                      ? '#10b981'
+                      : '#ef4444'
+                    : '#1f2d45',
               }}
               autoComplete="new-password"
               disabled={loading}
             />
 
             {confirmPassword.length > 0 && !doMatch && (
-              <p style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>Passwords don&apos;t match</p>
+              <p style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>
+                Passwords don&apos;t match
+              </p>
             )}
           </div>
 

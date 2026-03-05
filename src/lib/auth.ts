@@ -89,13 +89,10 @@ export async function signIn(
     const totpFactor = factorsData?.totp?.[0];
 
     if (!totpFactor || totpFactor.status !== 'verified') {
-      // No MFA set up yet — send to setup
       return { status: 'mfa_setup_required' };
     }
 
-    // TOTP is enrolled — sign out the password session and force MFA challenge
-    // This ensures the user MUST verify their Google Authenticator code
-return { status: 'mfa_required', factorId: totpFactor.id };
+    return { status: 'mfa_required', factorId: totpFactor.id };
   }
 
   return { status: 'error', error: 'Unexpected authentication state' };
@@ -112,10 +109,6 @@ export async function verifyMfa(
   const supabase = createClient();
 
   try {
-    // Re-authenticate with password is not needed here —
-    // Supabase MFA challenge works on the existing AAL1 session
-    // But since we signed out above, we need a fresh sign-in approach.
-    // Instead, we use the challenge/verify flow directly.
     const { data: challengeData, error: challengeError } =
       await supabase.auth.mfa.challenge({ factorId });
 
@@ -141,12 +134,27 @@ export async function verifyMfa(
 
 // ─────────────────────────────────────────────────────────────
 // ENROLL MFA
+//
+// FIX: Before enrolling, unenroll any stale unverified TOTP factors.
+// When a manager changes their password, Supabase nukes the session.
+// If a previous enroll attempt left a dangling unverified factor,
+// mfa.enroll() throws "invalid claim: missing sub claim". Cleaning
+// stale factors first prevents that.
 // ─────────────────────────────────────────────────────────────
 
 export async function enrollMfa(): Promise<MfaEnrollResult> {
   const supabase = createClient();
 
   try {
+    // Clean up any existing unverified TOTP factors first
+    const { data: existingFactors } = await supabase.auth.mfa.listFactors();
+    const unverifiedFactors =
+      existingFactors?.totp?.filter((f) => f.status !== 'verified') ?? [];
+
+    for (const factor of unverifiedFactors) {
+      await supabase.auth.mfa.unenroll({ factorId: factor.id });
+    }
+
     const { data, error } = await supabase.auth.mfa.enroll({
       factorType: 'totp',
     });
@@ -196,7 +204,9 @@ export async function verifyEnrolledMfa(
       };
     }
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
     if (session && API_URL) {
       await fetch(`${API_URL}/auth/mfa-setup-complete`, {
@@ -216,10 +226,20 @@ export async function verifyEnrolledMfa(
 
 // ─────────────────────────────────────────────────────────────
 // CHANGE PASSWORD
+//
+// FIX: Supabase's Admin API (used server-side) invalidates the current
+// session token when the password is updated. So by the time the user
+// lands on /setup-mfa, their JWT is dead and mfa.enroll() throws
+// "invalid claim: missing sub claim".
+//
+// Fix: grab email before the session dies, then immediately re-sign-in
+// with the new password after the API call succeeds to restore a fresh
+// live session. /setup-mfa now has a valid JWT to call mfa.enroll().
 // ─────────────────────────────────────────────────────────────
 
 export async function changePassword(
-  newPassword: string
+  newPassword: string,
+  credentials?: { email: string }
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = createClient();
 
@@ -228,11 +248,16 @@ export async function changePassword(
       return { success: false, error: 'NEXT_PUBLIC_API_URL is not set' };
     }
 
-    const { data: { session }, error: sessionErr } =
-      await supabase.auth.getSession();
+    const {
+      data: { session },
+      error: sessionErr,
+    } = await supabase.auth.getSession();
 
     if (sessionErr) return { success: false, error: sessionErr.message };
     if (!session) return { success: false, error: 'Not authenticated' };
+
+    // Capture email BEFORE the session gets killed by the password change
+    const userEmail = credentials?.email ?? session.user.email ?? '';
 
     const res = await fetch(`${API_URL}/auth/change-password`, {
       method: 'POST',
@@ -263,6 +288,26 @@ export async function changePassword(
       };
     }
 
+    // ── THE ACTUAL FIX ────────────────────────────────────────
+    // Re-sign in with the new password to restore a fresh live session.
+    // Without this, the next page (/setup-mfa) calls mfa.enroll() with
+    // a dead JWT and Supabase rejects it: "invalid claim: missing sub claim".
+    // ─────────────────────────────────────────────────────────
+    if (userEmail) {
+      const { error: reAuthError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: newPassword,
+      });
+
+      if (reAuthError) {
+        // Re-auth failed — session is fully dead, boot back to login
+        return {
+          success: false,
+          error: `Password changed but re-authentication failed: ${reAuthError.message}. Please log in again.`,
+        };
+      }
+    }
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Network error' };
@@ -276,7 +321,9 @@ export async function changePassword(
 export async function getMe(): Promise<EmployeeProfile | null> {
   const supabase = createClient();
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (!session || !API_URL) return null;
 
   try {
@@ -307,7 +354,9 @@ export async function getMe(): Promise<EmployeeProfile | null> {
 
 export async function signOut(): Promise<void> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (session && API_URL) {
     await fetch(`${API_URL}/auth/logout`, {
