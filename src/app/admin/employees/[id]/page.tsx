@@ -333,8 +333,8 @@ function ModuleCard({
           }}>▼</span>
         )}
         {!hasFlags && (
-          <span style={{ fontSize: 10, color: t.muted, fontStyle: 'italic', whiteSpace: 'nowrap' }}>
-            role-based only
+          <span style={{ fontSize: 10, color: t.muted, whiteSpace: 'nowrap' }}>
+            no extra flags
           </span>
         )}
       </div>
