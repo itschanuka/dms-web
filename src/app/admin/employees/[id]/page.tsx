@@ -229,7 +229,7 @@ function InfoRow({ label, value, color }: { label: string; value: React.ReactNod
 function Toggle({ on, onChange, disabled }: { on: boolean; onChange: () => void; disabled?: boolean }) {
   return (
     <div
-      onClick={disabled ? undefined : onChange}
+      onClick={disabled ? undefined : (e) => { e.stopPropagation(); onChange(); }}
       style={{
         width: 42, height: 23, borderRadius: 12, flexShrink: 0,
         background: on ? '#f97316' : 'rgba(128,128,128,0.2)',
@@ -341,7 +341,7 @@ function ModuleCard({
 
       {/* ── Flag rows (expanded) ── */}
       {open && hasFlags && (
-        <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div onClick={e => e.stopPropagation()} style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {mod.flags.map(flag => {
             const tc = TAG_COLORS[flag.tag]!;
             const active = perms[flag.key] ?? false;
