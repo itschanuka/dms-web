@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
 import { enrollMfa, verifyEnrolledMfa } from '@/lib/auth';
 
 type Step = 'loading' | 'scan' | 'verify' | 'done';
@@ -21,19 +22,43 @@ export default function SetupMfaPage() {
 
   useEffect(() => {
     async function enroll() {
+      // ── SESSION GUARD ─────────────────────────────────────────
+      // Before calling mfa.enroll(), verify there is actually a live
+      // session. If the manager came from /change-password and the
+      // re-auth in changePassword() failed silently, or the old
+      // auth.ts (without the fix) is still deployed, the session will
+      // be null here and mfa.enroll() throws "missing sub claim".
+      // Redirect to login instead of showing a cryptic error.
+      // ─────────────────────────────────────────────────────────
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.replace('/admin/login');
+        return;
+      }
+
       const result = await enrollMfa();
+
       if (result.status === 'success') {
         setFactorId(result.factorId ?? '');
         setQrCode(result.qrCode ?? '');
         setSecret(result.secret ?? '');
         setStep('scan');
       } else {
+        // If we still get SESSION_EXPIRED despite the guard above,
+        // the token was invalidated between the check and the enroll call.
+        // Boot back to login cleanly.
+        if (result.error === 'SESSION_EXPIRED') {
+          router.replace('/admin/login');
+          return;
+        }
         setError(result.error ?? 'Failed to start MFA setup');
-        setStep('scan'); // Show error state
+        setStep('scan');
       }
     }
     void enroll();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (step === 'verify') {

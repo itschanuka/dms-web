@@ -8,21 +8,18 @@ import { changePassword } from '@/lib/auth';
 export default function ChangePasswordPage() {
   const router = useRouter();
 
+  // FIX: We need the email to re-authenticate after the password change
+  // kills the current session. Grab it from the live session on mount.
   const [userEmail, setUserEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  // Grab the email from the live session on mount so we can pass it
-  // to changePassword() for re-auth after the password change kills
-  // the current session token.
   useEffect(() => {
     async function loadEmail() {
       const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
         setUserEmail(session.user.email);
       }
@@ -47,9 +44,6 @@ export default function ChangePasswordPage() {
     setError('');
     setLoading(true);
 
-    // Pass the email so changePassword() can re-sign-in after the Admin
-    // API nukes the session. Without this, mfa.enroll() on /setup-mfa
-    // throws "invalid claim: missing sub claim".
     const result = await changePassword(newPassword, { email: userEmail });
 
     setLoading(false);
@@ -59,8 +53,8 @@ export default function ChangePasswordPage() {
       return;
     }
 
-    // If re-auth failed the session is fully dead — boot to login
-    if (result.error?.includes('re-authentication failed')) {
+    // Re-auth completely failed — session is dead, kick to login
+    if (result.error?.includes('PASSWORD_CHANGED_REAUTH_FAILED')) {
       router.push('/admin/login');
       return;
     }
