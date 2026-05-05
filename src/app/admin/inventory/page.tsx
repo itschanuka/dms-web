@@ -8,7 +8,253 @@ import { adminApi, type AdminVehicle, type Pagination } from '@/lib/api';
 import { formatPrice, formatMileage } from '@/lib/formatters';
 import { useTheme } from '@/lib/theme';
 
-// ── Aging colour map ───────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────
+   STYLES — injected once, scoped with .inv- prefix
+───────────────────────────────────────────────────────────────── */
+const CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+
+  /* ── Tokens ── */
+  .inv-root {
+    --inv-font: 'DM Sans', sans-serif;
+    --inv-mono: 'JetBrains Mono', monospace;
+
+    /* dark */
+    --inv-bg:          #0b0f1a;
+    --inv-surface:     #111827;
+    --inv-surface-2:   #161d2e;
+    --inv-border:      rgba(255,255,255,0.07);
+    --inv-border-soft: rgba(255,255,255,0.04);
+    --inv-text:        #edf2fc;
+    --inv-text-b:      #a8bdd6;
+    --inv-text-c:      #536880;
+    --inv-text-d:      #2e4258;
+    --inv-input-bg:    #0d1421;
+    --inv-hover:       rgba(255,255,255,0.035);
+    --inv-accent:      #6366f1;
+    --inv-accent-glow: rgba(99,102,241,0.25);
+    --inv-green:       #10b981;
+    --inv-amber:       #f59e0b;
+    --inv-red:         #ef4444;
+    --inv-red-deep:    #dc2626;
+    --inv-radius-sm:   6px;
+    --inv-radius:      10px;
+    --inv-radius-lg:   14px;
+  }
+
+  .inv-root.inv-light {
+    --inv-bg:          #f0f4fa;
+    --inv-surface:     #ffffff;
+    --inv-surface-2:   #f5f8fd;
+    --inv-border:      rgba(0,0,0,0.08);
+    --inv-border-soft: rgba(0,0,0,0.04);
+    --inv-text:        #0f1e32;
+    --inv-text-b:      #2c4460;
+    --inv-text-c:      #5a7896;
+    --inv-text-d:      #9ab2c8;
+    --inv-input-bg:    #eaf1f9;
+    --inv-hover:       rgba(0,0,0,0.025);
+  }
+
+  .inv-root * { box-sizing: border-box; font-family: var(--inv-font); }
+
+  /* ── Layout ── */
+  .inv-root { background: var(--inv-bg); min-height: 100%; padding: 32px 28px; transition: background 0.25s; }
+
+  /* ── Header ── */
+  .inv-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+  .inv-title { font-size: 24px; font-weight: 900; color: var(--inv-text); margin: 0; letter-spacing: -0.5px; }
+  .inv-subtitle { font-size: 13px; color: var(--inv-text-c); margin-top: 4px; }
+
+  /* ── Add Button ── */
+  .inv-add-btn {
+    background: var(--inv-accent); color: #fff; text-decoration: none;
+    padding: 10px 20px; border-radius: var(--inv-radius); font-size: 13px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 6px;
+    box-shadow: 0 4px 20px var(--inv-accent-glow);
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+  }
+  .inv-add-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px var(--inv-accent-glow); }
+  .inv-add-btn:active { transform: translateY(0); opacity: 0.9; }
+
+  /* ── Analytics Panel ── */
+  .inv-analytics {
+    background: var(--inv-surface);
+    border: 1px solid var(--inv-border);
+    border-radius: var(--inv-radius-lg);
+    margin-bottom: 20px;
+    overflow: hidden;
+    transition: background 0.25s;
+  }
+  .inv-analytics-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 15px 20px; cursor: pointer;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+  }
+  .inv-analytics-header.open { border-color: var(--inv-border); }
+  .inv-analytics-header:hover { background: var(--inv-hover); }
+  .inv-analytics-title { font-size: 14px; font-weight: 800; color: var(--inv-text); display: flex; align-items: center; gap: 8px; }
+  .inv-analytics-meta { font-size: 11px; color: var(--inv-text-c); font-weight: 500; }
+  .inv-analytics-chevron { font-size: 11px; color: var(--inv-text-d); transition: transform 0.2s; }
+  .inv-analytics-chevron.open { transform: rotate(180deg); }
+  .inv-analytics-body { padding: 18px 20px; }
+
+  /* Preset tabs */
+  .inv-presets { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+  .inv-preset-btn {
+    padding: 5px 13px; border-radius: var(--inv-radius-sm); font-size: 12px; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--inv-border); background: transparent; color: var(--inv-text-c);
+    transition: all 0.15s;
+  }
+  .inv-preset-btn:hover { color: var(--inv-text); border-color: rgba(99,102,241,0.4); }
+  .inv-preset-btn.active { background: var(--inv-accent); border-color: var(--inv-accent); color: #fff; box-shadow: 0 2px 10px var(--inv-accent-glow); }
+  .inv-preset-range { font-size: 11px; color: var(--inv-text-d); margin-left: 4px; align-self: center; font-family: var(--inv-mono); }
+
+  /* KPI Grid */
+  .inv-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .inv-kpi-card {
+    background: var(--inv-surface-2); border: 1px solid var(--inv-border);
+    border-radius: var(--inv-radius); padding: 14px 16px;
+    transition: transform 0.15s;
+  }
+  .inv-kpi-card:hover { transform: translateY(-1px); }
+  .inv-kpi-label { font-size: 10px; font-weight: 700; color: var(--inv-text-c); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+  .inv-kpi-value { font-size: 18px; font-weight: 900; }
+
+  /* Two-col */
+  .inv-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  @media (max-width: 640px) { .inv-two-col { grid-template-columns: 1fr; } }
+  .inv-snapshot-card, .inv-aging-card {
+    background: var(--inv-surface-2); border: 1px solid var(--inv-border);
+    border-radius: var(--inv-radius); padding: 14px 16px;
+  }
+  .inv-card-label { font-size: 10px; font-weight: 700; color: var(--inv-text-c); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; }
+  .inv-snapshot-row { display: flex; justify-content: space-between; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--inv-border-soft); font-size: 12px; }
+  .inv-snapshot-row:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .inv-snapshot-row-label { color: var(--inv-text-c); }
+  .inv-snapshot-row-val { font-weight: 700; font-family: var(--inv-mono); font-size: 11px; }
+  .inv-status-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 14px; }
+  .inv-status-chip { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 5px; background: rgba(99,102,241,0.1); color: #818cf8; }
+
+  /* Aging */
+  .inv-aging-row { margin-bottom: 11px; }
+  .inv-aging-row:last-child { margin-bottom: 0; }
+  .inv-aging-meta { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .inv-aging-meta-label { color: var(--inv-text-c); }
+  .inv-aging-meta-val { font-weight: 700; font-family: var(--inv-mono); font-size: 11px; }
+  .inv-minibar-track { height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+  .inv-light .inv-minibar-track { background: rgba(0,0,0,0.07); }
+  .inv-minibar-fill { height: 100%; border-radius: 3px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+
+  /* Trend */
+  .inv-trend-card {
+    background: var(--inv-surface-2); border: 1px solid var(--inv-border);
+    border-radius: var(--inv-radius); padding: 14px 16px;
+  }
+  .inv-trend-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .inv-trend-legend { display: flex; gap: 14px; font-size: 10px; color: var(--inv-text-c); }
+  .inv-trend-legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+  .inv-trend-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .inv-spark-label { font-size: 10px; color: var(--inv-text-d); margin-bottom: 5px; }
+  .inv-sparkbars { display: flex; align-items: flex-end; gap: 2px; height: 38px; }
+  .inv-sparkbar { flex: 1; border-radius: 2px 2px 0 0; opacity: 0.75; transition: height 0.3s, opacity 0.2s; }
+  .inv-sparkbar:hover { opacity: 1; }
+  .inv-month-labels { display: flex; gap: 2px; margin-top: 5px; }
+  .inv-month-label { flex: 1; font-size: 8px; color: var(--inv-text-d); text-align: center; font-family: var(--inv-mono); }
+
+  /* ── Filters ── */
+  .inv-filters {
+    background: var(--inv-surface); border: 1px solid var(--inv-border);
+    border-radius: var(--inv-radius); padding: 14px 16px;
+    margin-bottom: 20px; display: flex; gap: 9px; flex-wrap: wrap; align-items: center;
+    transition: background 0.25s;
+  }
+  .inv-input {
+    background: var(--inv-input-bg); border: 1px solid var(--inv-border);
+    border-radius: var(--inv-radius-sm); padding: 8px 12px; font-size: 13px;
+    color: var(--inv-text); outline: none; min-width: 220px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .inv-input:focus { border-color: rgba(99,102,241,0.5); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+  .inv-input::placeholder { color: var(--inv-text-d); }
+  .inv-select-wrap { position: relative; }
+  .inv-select {
+    background: var(--inv-input-bg); border: 1px solid var(--inv-border);
+    border-radius: var(--inv-radius-sm); padding: 8px 28px 8px 12px; font-size: 13px;
+    color: var(--inv-text); outline: none; cursor: pointer; appearance: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .inv-select:focus { border-color: rgba(99,102,241,0.5); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+  .inv-select-arrow { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-size: 9px; color: var(--inv-text-d); pointer-events: none; }
+  .inv-clear-btn {
+    background: none; border: 1px solid var(--inv-border); border-radius: var(--inv-radius-sm);
+    color: var(--inv-red); font-size: 12px; font-weight: 600; padding: 8px 13px; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .inv-clear-btn:hover { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.3); }
+
+  /* ── Error ── */
+  .inv-error {
+    background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.18);
+    border-radius: var(--inv-radius-sm); padding: 12px 16px; color: #fca5a5;
+    font-size: 13px; margin-bottom: 16px;
+  }
+
+  /* ── Table Card ── */
+  .inv-table-card {
+    background: var(--inv-surface); border: 1px solid var(--inv-border);
+    border-radius: var(--inv-radius-lg); overflow: hidden; transition: background 0.25s;
+  }
+  .inv-loading, .inv-empty { padding: 48px; text-align: center; color: var(--inv-text-c); font-size: 13px; }
+  .inv-empty-icon { font-size: 38px; margin-bottom: 12px; }
+  .inv-empty-title { font-size: 15px; font-weight: 700; color: var(--inv-text); margin-bottom: 6px; }
+  .inv-empty-sub { font-size: 13px; color: var(--inv-text-c); margin-bottom: 22px; }
+  .inv-table-scroll { overflow-x: auto; }
+
+  table.inv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.inv-table thead tr { border-bottom: 1px solid var(--inv-border); background: var(--inv-surface-2); }
+  table.inv-table th {
+    padding: 11px 14px; text-align: left; font-size: 10px; font-weight: 700;
+    color: var(--inv-text-c); letter-spacing: 0.08em; white-space: nowrap; text-transform: uppercase;
+  }
+  table.inv-table tbody tr { border-top: 1px solid var(--inv-border-soft); transition: background 0.1s; }
+  table.inv-table tbody tr:first-child { border-top: none; }
+  table.inv-table tbody tr:hover { background: var(--inv-hover); }
+  table.inv-table td { padding: 13px 14px; }
+
+  .inv-stock-id { font-weight: 700; color: var(--inv-accent); white-space: nowrap; font-family: var(--inv-mono); font-size: 12px; }
+  .inv-vehicle-name { font-weight: 700; color: var(--inv-text); }
+  .inv-vehicle-variant { font-size: 11px; color: var(--inv-text-c); margin-top: 2px; }
+  .inv-age-val { font-size: 11px; font-weight: 700; font-family: var(--inv-mono); }
+  .inv-mileage { color: var(--inv-text-b); white-space: nowrap; font-family: var(--inv-mono); font-size: 12px; }
+  .inv-price { font-weight: 700; color: var(--inv-text); white-space: nowrap; font-family: var(--inv-mono); font-size: 12px; }
+  .inv-cost { color: var(--inv-amber); font-weight: 600; white-space: nowrap; font-family: var(--inv-mono); font-size: 12px; }
+  .inv-profit { font-weight: 700; white-space: nowrap; font-family: var(--inv-mono); font-size: 12px; }
+  .inv-profit.positive { color: var(--inv-green); }
+  .inv-profit.negative { color: var(--inv-red); }
+  .inv-website-live { font-size: 11px; font-weight: 600; color: var(--inv-green); }
+  .inv-website-hidden { font-size: 11px; font-weight: 600; color: var(--inv-text-d); }
+  .inv-view-link { font-size: 12px; color: var(--inv-accent); text-decoration: none; font-weight: 700; white-space: nowrap; transition: opacity 0.15s; }
+  .inv-view-link:hover { opacity: 0.7; }
+
+  /* ── Pagination ── */
+  .inv-pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 22px; }
+  .inv-page-btn {
+    padding: 8px 16px; border-radius: var(--inv-radius-sm); font-size: 12px; font-weight: 700;
+    background: var(--inv-surface); border: 1px solid var(--inv-border);
+    color: var(--inv-text-b); cursor: pointer; transition: all 0.15s;
+  }
+  .inv-page-btn:not(:disabled):hover { border-color: var(--inv-accent); color: var(--inv-accent); }
+  .inv-page-btn:disabled { color: var(--inv-text-d); cursor: not-allowed; opacity: 0.5; }
+  .inv-page-info { font-size: 12px; color: var(--inv-text-c); font-family: var(--inv-mono); }
+
+  /* ── Analytics error/loading ── */
+  .inv-analytics-error { font-size: 12px; color: var(--inv-red); margin-bottom: 12px; }
+  .inv-analytics-loading { font-size: 13px; color: var(--inv-text-c); padding: 20px 0; }
+`;
+
+// ── Aging colour map (unchanged) ──────────────────────────────────
 const AGING_COLORS: Record<string, string> = {
   fresh:      '#10b981',
   aging:      '#f59e0b',
@@ -16,66 +262,52 @@ const AGING_COLORS: Record<string, string> = {
   dead_stock: '#dc2626',
 };
 
-// ── Date preset helpers ────────────────────────────────────────
-function toDateStr(d: Date) {
-  return d.toISOString().split('T')[0]!;
-}
-
+// ── Date preset helpers (unchanged) ──────────────────────────────
+function toDateStr(d: Date) { return d.toISOString().split('T')[0]!; }
 function getPresetRange(preset: string): { from: string; to: string } {
   const today = new Date();
   const to    = toDateStr(today);
   switch (preset) {
-    case 'today': {
-      return { from: to, to };
-    }
-    case 'week': {
-      const d = new Date(today); d.setDate(d.getDate() - 6);
-      return { from: toDateStr(d), to };
-    }
-    case 'month': {
-      return { from: `${to.slice(0, 7)}-01`, to };
-    }
-    case '3months': {
-      const d = new Date(today); d.setMonth(d.getMonth() - 3);
-      return { from: toDateStr(d), to };
-    }
-    case 'year': {
-      return { from: `${today.getFullYear()}-01-01`, to };
-    }
-    default:
-      return { from: `${to.slice(0, 7)}-01`, to };
+    case 'today':   return { from: to, to };
+    case 'week':    { const d = new Date(today); d.setDate(d.getDate() - 6); return { from: toDateStr(d), to }; }
+    case 'month':   return { from: `${to.slice(0, 7)}-01`, to };
+    case '3months': { const d = new Date(today); d.setMonth(d.getMonth() - 3); return { from: toDateStr(d), to }; }
+    case 'year':    return { from: `${today.getFullYear()}-01-01`, to };
+    default:        return { from: `${to.slice(0, 7)}-01`, to };
   }
 }
 
-// ── Mini bar chart (pure CSS) ───────────────────────────────────
+// ── Mini bar (pure CSS via className) ──────────────────────────
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.max(4, (value / max) * 100) : 0;
   return (
-    <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden', marginTop: 4 }}>
-      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.4s ease' }} />
+    <div className="inv-minibar-track">
+      <div className="inv-minibar-fill" style={{ width: `${pct}%`, background: color }} />
     </div>
   );
 }
 
-// ── Trend spark bars ───────────────────────────────────────────
+// ── Spark bars (unchanged logic) ─────────────────────────────────
 function SparkBars({ data, field, color }: { data: Array<{ month: string; added: number; sold: number }>; field: 'added' | 'sold'; color: string }) {
   const max = Math.max(...data.map(d => d[field]), 1);
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 36 }}>
-      {data.slice(-12).map((d: { month: string; added: number; sold: number }) => {
-        const h = Math.max(2, (d[field] / max) * 36);
+    <div className="inv-sparkbars">
+      {data.slice(-12).map((d) => {
+        const h = Math.max(2, (d[field] / max) * 38);
         return (
-          <div key={d.month} title={`${d.month}: ${d[field]}`} style={{
-            flex: 1, height: h, background: color, borderRadius: '2px 2px 0 0',
-            opacity: 0.7, transition: 'height 0.3s',
-          }} />
+          <div
+            key={d.month}
+            className="inv-sparkbar"
+            title={`${d.month}: ${d[field]}`}
+            style={{ height: h, background: color }}
+          />
         );
       })}
     </div>
   );
 }
 
-// ── Analytics data type (unwrapped success shape) ───────────────
+// ── Analytics data type (unchanged) ─────────────────────────────
 type AnalyticsData = {
   period:            { from: string; to: string };
   totalVehicles:     number;
@@ -102,21 +334,13 @@ const PRESETS = [
 ];
 
 function AnalyticsPanel({ isDark }: { isDark: boolean }) {
-  const [preset,   setPreset]   = useState('month');
-  const [data,     setData]     = useState<AnalyticsData | null>(null);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState('');
-  const [open,     setOpen]     = useState(true);
+  const [preset,  setPreset]  = useState('month');
+  const [data,    setData]    = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
+  const [open,    setOpen]    = useState(true);
 
-  const c = {
-    panelBg:  isDark ? '#0d1525' : '#ddeaf8',
-    cardBg:   isDark ? '#111827' : '#e8f2fb',
-    border:   isDark ? '#1f2d45' : '#b2c4d8',
-    text:     isDark ? '#e8f0fc' : '#0f1e32',
-    sub:      isDark ? '#5c7090' : '#4a6278',
-    muted:    isDark ? '#3d5270' : '#7a96b0',
-  };
-
+  // ── All fetch logic UNCHANGED ──
   const load = useCallback(async (p: string) => {
     setLoading(true);
     setError('');
@@ -133,127 +357,105 @@ function AnalyticsPanel({ isDark }: { isDark: boolean }) {
 
   useEffect(() => { void load(preset); }, [preset, load]);
 
-  const ag = data?.agingBreakdown ?? { fresh: 0, aging: 0, old: 0, dead_stock: 0 };
+  const ag       = data?.agingBreakdown ?? { fresh: 0, aging: 0, old: 0, dead_stock: 0 };
   const maxAging = Math.max(ag.fresh, ag.aging, ag.old, ag.dead_stock, 1);
 
   return (
-    <div style={{ background: c.panelBg, border: `1px solid ${c.border}`, borderRadius: 12, marginBottom: 20, overflow: 'hidden', transition: 'background 0.25s' }}>
-      {/* Panel header */}
+    <div className="inv-analytics">
       <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', cursor: 'pointer', borderBottom: open ? `1px solid ${c.border}` : 'none' }}
+        className={`inv-analytics-header${open ? ' open' : ''}`}
         onClick={() => setOpen(o => !o)}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: c.text }}>📊 Analytics</span>
+          <span className="inv-analytics-title">
+            <span>📊</span> Analytics
+          </span>
           {data && (
-            <span style={{ fontSize: 11, color: c.sub, fontWeight: 500 }}>
+            <span className="inv-analytics-meta">
               {data.totalVehicles} vehicles total · {data.availableCount} available
             </span>
           )}
         </div>
-        <span style={{ fontSize: 12, color: c.muted }}>{open ? '▲' : '▼'}</span>
+        <span className={`inv-analytics-chevron${open ? ' open' : ''}`}>▼</span>
       </div>
 
       {open && (
-        <div style={{ padding: '16px 18px' }}>
+        <div className="inv-analytics-body">
           {/* Preset tabs */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
+          <div className="inv-presets">
             {PRESETS.map(p => (
               <button
                 key={p.key}
+                className={`inv-preset-btn${preset === p.key ? ' active' : ''}`}
                 onClick={() => setPreset(p.key)}
-                style={{
-                  padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                  background: preset === p.key ? '#6366f1' : 'transparent',
-                  border:     preset === p.key ? '1px solid #6366f1' : `1px solid ${c.border}`,
-                  color:      preset === p.key ? '#fff' : c.sub,
-                  transition: 'all 0.15s',
-                }}
               >
                 {p.label}
               </button>
             ))}
             {data && (
-              <span style={{ fontSize: 11, color: c.muted, alignSelf: 'center', marginLeft: 4 }}>
+              <span className="inv-preset-range">
                 {data.period.from} → {data.period.to}
               </span>
             )}
           </div>
 
-          {error && (
-            <div style={{ fontSize: 12, color: '#ef4444', marginBottom: 12 }}>⚠️ {error}</div>
-          )}
+          {error && <div className="inv-analytics-error">⚠️ {error}</div>}
 
           {loading ? (
-            <div style={{ fontSize: 13, color: c.sub, padding: '20px 0' }}>Loading analytics…</div>
+            <div className="inv-analytics-loading">Loading analytics…</div>
           ) : data && (
-            <div>
-              {/* ── Row 1: Period KPIs ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 16 }}>
+            <>
+              {/* Row 1: Period KPIs */}
+              <div className="inv-kpi-grid">
                 {[
                   { label: 'Added This Period',   value: data.addedInPeriod,   color: '#818cf8', fmt: (n: number) => String(n) },
                   { label: 'Sold This Period',    value: data.soldInPeriod,    color: '#10b981', fmt: (n: number) => String(n) },
                   { label: 'Revenue This Period', value: data.revenueInPeriod, color: '#34d399', fmt: formatPrice },
                   { label: 'Profit This Period',  value: data.profitInPeriod,  color: data.profitInPeriod >= 0 ? '#10b981' : '#ef4444', fmt: formatPrice },
                 ].map(kpi => (
-                  <div key={kpi.label} style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '13px 15px' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: c.sub, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>
-                      {kpi.label}
-                    </div>
-                    <div style={{ fontSize: 17, fontWeight: 900, color: kpi.color }}>
-                      {kpi.fmt(kpi.value)}
-                    </div>
+                  <div key={kpi.label} className="inv-kpi-card">
+                    <div className="inv-kpi-label">{kpi.label}</div>
+                    <div className="inv-kpi-value" style={{ color: kpi.color }}>{kpi.fmt(kpi.value)}</div>
                   </div>
                 ))}
               </div>
 
-              {/* ── Row 2: Live inventory snapshot + aging ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+              {/* Row 2: Snapshot + Aging */}
+              <div className="inv-two-col">
                 {/* Inventory snapshot */}
-                <div style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '13px 15px' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: c.sub, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10 }}>
-                    Live Inventory Value
-                  </div>
+                <div className="inv-snapshot-card">
+                  <div className="inv-card-label">Live Inventory Value</div>
                   {[
-                    { label: 'Total Asking', value: data.inventoryValue,    color: '#fff'     },
-                    { label: 'Cost Basis',   value: data.inventoryCostBase, color: '#f59e0b'  },
+                    { label: 'Total Asking', value: data.inventoryValue,    color: 'var(--inv-text)' },
+                    { label: 'Cost Basis',   value: data.inventoryCostBase, color: '#f59e0b'          },
                     { label: 'Est. Profit',  value: data.inventoryProfit,   color: data.inventoryProfit >= 0 ? '#10b981' : '#ef4444' },
                   ].map(row => (
-                    <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 7, marginBottom: 7, borderBottom: `1px solid ${c.border}`, fontSize: 12 }}>
-                      <span style={{ color: c.sub }}>{row.label}</span>
-                      <span style={{ fontWeight: 700, color: row.color }}>{formatPrice(row.value)}</span>
+                    <div key={row.label} className="inv-snapshot-row">
+                      <span className="inv-snapshot-row-label">{row.label}</span>
+                      <span className="inv-snapshot-row-val" style={{ color: row.color }}>{formatPrice(row.value)}</span>
                     </div>
                   ))}
-
-                  {/* Status breakdown */}
-                  <div style={{ fontSize: 10, fontWeight: 700, color: c.muted, letterSpacing: '0.07em', textTransform: 'uppercase', marginTop: 12, marginBottom: 8 }}>By Status</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <div className="inv-card-label" style={{ marginTop: 14 }}>By Status</div>
+                  <div className="inv-status-chips">
                     {Object.entries(data.statusCounts).map(([status, count]) => (
-                      <span key={status} style={{
-                        fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4,
-                        background: 'rgba(99,102,241,0.12)', color: '#818cf8',
-                      }}>
-                        {status}: {count}
-                      </span>
+                      <span key={status} className="inv-status-chip">{status}: {count}</span>
                     ))}
                   </div>
                 </div>
 
                 {/* Aging breakdown */}
-                <div style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '13px 15px' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: c.sub, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10 }}>
-                    Stock Aging (Available)
-                  </div>
+                <div className="inv-aging-card">
+                  <div className="inv-card-label">Stock Aging (Available)</div>
                   {([
                     { key: 'fresh',      label: 'Fresh (0–30d)',     color: '#10b981' },
                     { key: 'aging',      label: 'Aging (31–60d)',    color: '#f59e0b' },
                     { key: 'old',        label: 'Old (61–90d)',      color: '#ef4444' },
                     { key: 'dead_stock', label: 'Dead Stock (90d+)', color: '#dc2626' },
                   ] as const).map(row => (
-                    <div key={row.key} style={{ marginBottom: 10 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                        <span style={{ color: c.sub }}>{row.label}</span>
-                        <span style={{ fontWeight: 700, color: row.color }}>{ag[row.key]}</span>
+                    <div key={row.key} className="inv-aging-row">
+                      <div className="inv-aging-meta">
+                        <span className="inv-aging-meta-label">{row.label}</span>
+                        <span className="inv-aging-meta-val" style={{ color: row.color }}>{ag[row.key]}</span>
                       </div>
                       <MiniBar value={ag[row.key]} max={maxAging} color={row.color} />
                     </div>
@@ -261,39 +463,34 @@ function AnalyticsPanel({ isDark }: { isDark: boolean }) {
                 </div>
               </div>
 
-              {/* ── Row 3: Monthly trend bars ── */}
+              {/* Row 3: Monthly trend */}
               {data.monthlyTrend.length > 0 && (
-                <div style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '13px 15px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: c.sub, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
-                      12-Month Trend
-                    </div>
-                    <div style={{ display: 'flex', gap: 14, fontSize: 10, color: c.muted }}>
-                      <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#818cf8', marginRight: 4 }} />Added</span>
-                      <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#10b981', marginRight: 4 }} />Sold</span>
+                <div className="inv-trend-card">
+                  <div className="inv-trend-header">
+                    <div className="inv-card-label" style={{ marginBottom: 0 }}>12-Month Trend</div>
+                    <div className="inv-trend-legend">
+                      <span><span className="inv-trend-legend-dot" style={{ background: '#818cf8' }} />Added</span>
+                      <span><span className="inv-trend-legend-dot" style={{ background: '#10b981' }} />Sold</span>
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="inv-trend-cols">
                     <div>
-                      <div style={{ fontSize: 10, color: c.muted, marginBottom: 4 }}>Vehicles Added</div>
+                      <div className="inv-spark-label">Vehicles Added</div>
                       <SparkBars data={data.monthlyTrend} field="added" color="#818cf8" />
                     </div>
                     <div>
-                      <div style={{ fontSize: 10, color: c.muted, marginBottom: 4 }}>Vehicles Sold</div>
+                      <div className="inv-spark-label">Vehicles Sold</div>
                       <SparkBars data={data.monthlyTrend} field="sold" color="#10b981" />
                     </div>
                   </div>
-                  {/* Month labels */}
-                  <div style={{ display: 'flex', gap: 2, marginTop: 4 }}>
-                    {data.monthlyTrend.slice(-12).map((d: { month: string; added: number; sold: number }) => (
-                      <div key={d.month} style={{ flex: 1, fontSize: 8, color: c.muted, textAlign: 'center' }}>
-                        {d.month.slice(5)}
-                      </div>
+                  <div className="inv-month-labels">
+                    {data.monthlyTrend.slice(-12).map((d) => (
+                      <div key={d.month} className="inv-month-label">{d.month.slice(5)}</div>
                     ))}
                   </div>
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       )}
@@ -302,7 +499,7 @@ function AnalyticsPanel({ isDark }: { isDark: boolean }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MAIN INVENTORY PAGE
+// MAIN INVENTORY PAGE — all fetch/state logic UNTOUCHED
 // ═══════════════════════════════════════════════════════════════
 
 export default function InventoryListPage() {
@@ -317,30 +514,7 @@ export default function InventoryListPage() {
   const [website,    setWebsite]    = useState('');
   const [page,       setPage]       = useState(1);
 
-  const c = {
-    pageBg:      isDark ? '#141c2e' : '#dde6f0',
-    cardBg:      isDark ? '#1a2236' : '#e8f2fb',
-    filterBg:    isDark ? '#1e2840' : '#ddeaf8',
-    border:      isDark ? '#243048' : '#b2c4d8',
-    borderLight: isDark ? '#1e2a3e' : '#c8d8e8',
-    textPrimary: isDark ? '#e8f0fc' : '#0f1e32',
-    textBody:    isDark ? '#b8cce0' : '#243650',
-    textSub:     isDark ? '#6b82a0' : '#4a6278',
-    textMuted:   isDark ? '#3d5270' : '#7a96b0',
-    inputBg:     isDark ? '#111827' : '#d8e8f4',
-    inputText:   isDark ? '#d0dff0' : '#1a2c42',
-    inputBorder: isDark ? '#243048' : '#a8bed4',
-    rowHover:    isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
-    stockId:     isDark ? '#818cf8' : '#4f46e5',
-  };
-
-  const INPUT: React.CSSProperties = {
-    background: c.inputBg, border: `1px solid ${c.inputBorder}`,
-    borderRadius: 7, padding: '7px 11px', fontSize: 13,
-    color: c.inputText, outline: 'none',
-  };
-  const SELECT: React.CSSProperties = { ...INPUT, appearance: 'none', cursor: 'pointer', paddingRight: 24 };
-
+  // ── All fetch logic UNCHANGED ──
   const load = useCallback(async (pg = 1) => {
     setLoading(true);
     setError('');
@@ -367,39 +541,37 @@ export default function InventoryListPage() {
 
   return (
     <AdminShell>
-      <div style={{ padding: '28px', background: c.pageBg, minHeight: '100%', transition: 'background 0.25s' }}>
+      {/* Inject scoped CSS once */}
+      <style>{CSS}</style>
+
+      <div className={`inv-root${isDark ? '' : ' inv-light'}`}>
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div className="inv-header">
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 900, color: c.textPrimary, margin: 0, letterSpacing: '-0.4px' }}>
-              Inventory
-            </h1>
+            <h1 className="inv-title">Inventory</h1>
             {pagination && (
-              <div style={{ fontSize: 13, color: c.textSub, marginTop: 4 }}>
+              <div className="inv-subtitle">
                 {pagination.total} vehicle{pagination.total !== 1 ? 's' : ''} total
               </div>
             )}
           </div>
-          <Link href="/admin/inventory/new" style={{
-            background: '#6366f1', color: '#fff', textDecoration: 'none',
-            padding: '10px 20px', borderRadius: 9, fontSize: 13, fontWeight: 700,
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            boxShadow: '0 2px 12px rgba(99,102,241,0.35)',
-          }}>
+          <Link href="/admin/inventory/new" className="inv-add-btn">
             + Add Vehicle
           </Link>
         </div>
 
-        {/* ── Analytics panel ── */}
+        {/* Analytics */}
         <AnalyticsPanel isDark={isDark} />
 
         {/* Filters */}
-        <div style={{ background: c.filterBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '14px 16px', marginBottom: 20, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', transition: 'background 0.25s' }}>
+        <div className="inv-filters">
           <input
-            type="text" value={search} onChange={e => setSearch(e.target.value)}
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
             placeholder="Search make, model, stock ID…"
-            style={{ ...INPUT, minWidth: 220 }}
+            className="inv-input"
           />
 
           {[
@@ -407,89 +579,80 @@ export default function InventoryListPage() {
             { value: aging,   onChange: setAging,   options: [['', 'All Ages'], ['fresh','Fresh (0–30d)'], ['aging','Aging (31–60d)'], ['old','Old (61–90d)'], ['dead_stock','Dead Stock (90d+)']] as [string,string][] },
             { value: website, onChange: setWebsite, options: [['', 'Website: All'], ['true','Website: Visible'], ['false','Website: Hidden']] as [string,string][] },
           ].map((f, i) => (
-            <div key={i} style={{ position: 'relative' }}>
-              <select value={f.value} onChange={e => f.onChange(e.target.value)} style={SELECT}>
+            <div key={i} className="inv-select-wrap">
+              <select value={f.value} onChange={e => f.onChange(e.target.value)} className="inv-select">
                 {f.options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
-              <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: c.textMuted, pointerEvents: 'none' }}>▼</span>
+              <span className="inv-select-arrow">▼</span>
             </div>
           ))}
 
           {(status || aging || search || website) && (
-            <button onClick={() => { setStatus(''); setAging(''); setSearch(''); setWebsite(''); }} style={{
-              background: 'none', border: `1px solid ${c.border}`, borderRadius: 7,
-              color: '#ef4444', fontSize: 12, fontWeight: 600, padding: '7px 12px', cursor: 'pointer',
-            }}>
+            <button
+              className="inv-clear-btn"
+              onClick={() => { setStatus(''); setAging(''); setSearch(''); setWebsite(''); }}
+            >
               ✕ Clear
             </button>
           )}
         </div>
 
         {/* Error */}
-        {error && (
-          <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '12px 16px', color: '#fca5a5', fontSize: 13, marginBottom: 16 }}>
-            ⚠️ {error}
-          </div>
-        )}
+        {error && <div className="inv-error">⚠️ {error}</div>}
 
         {/* Table */}
-        <div style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden', transition: 'background 0.25s' }}>
+        <div className="inv-table-card">
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: c.textSub, fontSize: 13 }}>Loading…</div>
+            <div className="inv-loading">Loading…</div>
           ) : vehicles.length === 0 ? (
-            <div style={{ padding: 60, textAlign: 'center' }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>🚗</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: c.textPrimary, marginBottom: 6 }}>No vehicles found</div>
-              <div style={{ fontSize: 13, color: c.textSub, marginBottom: 20 }}>Add your first vehicle to get started</div>
-              <Link href="/admin/inventory/new" style={{ background: '#6366f1', color: '#fff', textDecoration: 'none', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700 }}>
+            <div className="inv-empty">
+              <div className="inv-empty-icon">🚗</div>
+              <div className="inv-empty-title">No vehicles found</div>
+              <div className="inv-empty-sub">Add your first vehicle to get started</div>
+              <Link href="/admin/inventory/new" className="inv-add-btn">
                 + Add Vehicle
               </Link>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <div className="inv-table-scroll">
+              <table className="inv-table">
                 <thead>
-                  <tr style={{ borderBottom: `1px solid ${c.border}`, background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.04)' }}>
+                  <tr>
                     {['Stock ID', 'Vehicle', 'Status', 'Age', 'Mileage', 'Asking Price', 'Total Cost', 'Est. Profit', 'Website', ''].map(h => (
-                      <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: c.textSub, letterSpacing: '0.07em', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
-                        {h}
-                      </th>
+                      <th key={h}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {vehicles.map((v, i) => (
-                    <tr key={v.id}
-                      style={{ borderTop: i > 0 ? `1px solid ${c.borderLight}` : 'none', transition: 'background 0.1s' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = c.rowHover)}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <td style={{ padding: '12px 14px', fontWeight: 700, color: c.stockId, whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 12 }}>{v.stock_id}</td>
-                      <td style={{ padding: '12px 14px', minWidth: 180 }}>
-                        <div style={{ fontWeight: 700, color: c.textPrimary }}>{v.year} {v.make} {v.model}</div>
-                        {v.variant && <div style={{ fontSize: 11, color: c.textSub, marginTop: 2 }}>{v.variant}</div>}
+                  {vehicles.map((v) => (
+                    <tr key={v.id}>
+                      <td><span className="inv-stock-id">{v.stock_id}</span></td>
+                      <td>
+                        <div className="inv-vehicle-name">{v.year} {v.make} {v.model}</div>
+                        {v.variant && <div className="inv-vehicle-variant">{v.variant}</div>}
                       </td>
-                      <td style={{ padding: '12px 14px' }}><StatusBadge status={v.status} /></td>
-                      <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: AGING_COLORS[v.aging_bucket] ?? c.textSub }}>
+                      <td><StatusBadge status={v.status} /></td>
+                      <td>
+                        <span className="inv-age-val" style={{ color: AGING_COLORS[v.aging_bucket] ?? 'var(--inv-text-c)' }}>
                           {v.days_in_stock}d
                         </span>
                       </td>
-                      <td style={{ padding: '12px 14px', color: c.textBody, whiteSpace: 'nowrap' }}>{formatMileage(v.mileage)}</td>
-                      <td style={{ padding: '12px 14px', fontWeight: 700, color: c.textPrimary, whiteSpace: 'nowrap' }}>{formatPrice(v.asking_price)}</td>
-                      <td style={{ padding: '12px 14px', color: '#f59e0b', fontWeight: 600, whiteSpace: 'nowrap' }}>{formatPrice(v.total_cost_cache ?? v.purchase_price)}</td>
-                      <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontWeight: 700, color: v.estimated_profit >= 0 ? '#10b981' : '#ef4444' }}>
+                      <td><span className="inv-mileage">{formatMileage(v.mileage)}</span></td>
+                      <td><span className="inv-price">{formatPrice(v.asking_price)}</span></td>
+                      <td><span className="inv-cost">{formatPrice(v.total_cost_cache ?? v.purchase_price)}</span></td>
+                      <td>
+                        <span className={`inv-profit${v.estimated_profit >= 0 ? ' positive' : ' negative'}`}>
                           {v.estimated_profit >= 0 ? '+' : ''}{formatPrice(v.estimated_profit)}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 14px' }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: v.show_on_website ? '#10b981' : c.textMuted }}>
-                          {v.show_on_website ? '✓ Live' : '✗ Hidden'}
-                        </span>
+                      <td>
+                        {v.show_on_website
+                          ? <span className="inv-website-live">✓ Live</span>
+                          : <span className="inv-website-hidden">✗ Hidden</span>
+                        }
                       </td>
-                      <td style={{ padding: '12px 14px' }}>
-                        <Link href={`/admin/inventory/${v.id}`} style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <td>
+                        <Link href={`/admin/inventory/${v.id}`} className="inv-view-link">
                           View →
                         </Link>
                       </td>
@@ -503,20 +666,18 @@ export default function InventoryListPage() {
 
         {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 20 }}>
-            <button onClick={() => void load(page - 1)} disabled={!pagination.hasPrev} style={{
-              padding: '7px 14px', borderRadius: 7, fontSize: 12, fontWeight: 600,
-              background: c.cardBg, border: `1px solid ${c.border}`,
-              color: pagination.hasPrev ? c.textBody : c.textMuted,
-              cursor: pagination.hasPrev ? 'pointer' : 'not-allowed',
-            }}>← Prev</button>
-            <span style={{ fontSize: 12, color: c.textSub }}>Page {page} of {pagination.totalPages}</span>
-            <button onClick={() => void load(page + 1)} disabled={!pagination.hasNext} style={{
-              padding: '7px 14px', borderRadius: 7, fontSize: 12, fontWeight: 600,
-              background: c.cardBg, border: `1px solid ${c.border}`,
-              color: pagination.hasNext ? c.textBody : c.textMuted,
-              cursor: pagination.hasNext ? 'pointer' : 'not-allowed',
-            }}>Next →</button>
+          <div className="inv-pagination">
+            <button
+              className="inv-page-btn"
+              onClick={() => void load(page - 1)}
+              disabled={!pagination.hasPrev}
+            >← Prev</button>
+            <span className="inv-page-info">Page {page} of {pagination.totalPages}</span>
+            <button
+              className="inv-page-btn"
+              onClick={() => void load(page + 1)}
+              disabled={!pagination.hasNext}
+            >Next →</button>
           </div>
         )}
       </div>
