@@ -40,8 +40,8 @@ function getRecordSubtitle(type: string, record: TrashRecord): string {
   if (type === 'vehicles')  return `${record.year ?? ''} ${record.make ?? ''} ${record.model ?? ''}`.trim();
   if (type === 'customers') return record.phone_primary ?? '';
   if (type === 'leads')     return `${record.source ?? ''} · ${record.status ?? ''}`;
-  if (type === 'deals')     return record.selling_price ? `LKR ${Number(record.selling_price).toLocaleString()}` : '';
-  if (type === 'expenses')  return `${record.category ?? ''} · ${record.amount ? `LKR ${Number(record.amount).toLocaleString()}` : ''}`;
+  if (type === 'deals')     return record.selling_price ? `usd ${Number(record.selling_price).toLocaleString()}` : '';
+  if (type === 'expenses')  return `${record.category ?? ''} · ${record.amount ? `usd ${Number(record.amount).toLocaleString()}` : ''}`;
   return '';
 }
 

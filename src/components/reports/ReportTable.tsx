@@ -30,7 +30,7 @@ interface ReportTableProps {
 
 function formatCell(value: unknown, format?: string): string {
   if (value === null || value === undefined || value === '') return '—';
-  if (format === 'currency') return `LKR ${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+  if (format === 'currency') return `usd ${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
   if (format === 'percent')  return `${Number(value).toFixed(1)}%`;
   if (format === 'number')   return Number(value).toLocaleString();
   if (format === 'date')     return new Date(String(value)).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });

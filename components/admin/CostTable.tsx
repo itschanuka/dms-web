@@ -250,7 +250,7 @@ export default function CostTable({ vehicleId, stockId, canEdit }: Props) {
             </div>
             <div>
               <label style={{ fontSize: 11, color: '#5c7090', display: 'block', marginBottom: 4 }}>
-                Amount (LKR) <span style={{ color: '#ef4444' }}>*</span>
+                Amount (usd) <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <input
                 type="number" min="0" step="1"

@@ -168,7 +168,7 @@ function EmployeesContent() {
                     {emp.commission_type ? (
                       <span style={{ fontSize: 12, color: '#f59e0b' }}>
                         {emp.commission_type.replace(/_/g, ' ')}
-                        {emp.commission_value !== null ? ` · ${emp.commission_value}${emp.commission_type === 'fixed' ? ' LKR' : '%'}` : ''}
+                        {emp.commission_value !== null ? ` · ${emp.commission_value}${emp.commission_type === 'fixed' ? ' usd' : '%'}` : ''}
                       </span>
                     ) : <span style={{ color: t.muted, fontSize: 12 }}>None</span>}
                   </td>

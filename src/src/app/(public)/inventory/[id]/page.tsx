@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const vehicle = result.data;
     return {
       title: `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.variant ? ' ' + vehicle.variant : ''}`,
-      description: `${vehicle.condition} ${vehicle.year} ${vehicle.make} ${vehicle.model} — ${vehicle.fuel_type}, ${vehicle.transmission}. Asking price: LKR ${vehicle.asking_price.toLocaleString()}.`,
+      description: `${vehicle.condition} ${vehicle.year} ${vehicle.make} ${vehicle.model} — ${vehicle.fuel_type}, ${vehicle.transmission}. Asking price: usd ${vehicle.asking_price.toLocaleString()}.`,
     };
   } catch {
     return { title: 'Vehicle Detail' };

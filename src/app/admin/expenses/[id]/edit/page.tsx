@@ -123,7 +123,7 @@ export default function EditExpensePage({ params }: Props) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
-              <label style={lbl}>Amount (LKR) *</label>
+              <label style={lbl}>Amount (usd) *</label>
               <input type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} style={inp} />
             </div>
             <div>

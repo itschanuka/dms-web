@@ -363,7 +363,7 @@ export default function NewDealPage() {
             </div>
 
             <div style={{ ...grid3, marginBottom: 16 }}>
-              <Field label="Selling Price (LKR)" required t={t}>
+              <Field label="Selling Price (usd)" required t={t}>
                 <input
                   type="number" min="0" step="0.01"
                   value={sellingPrice}
@@ -374,7 +374,7 @@ export default function NewDealPage() {
                 />
               </Field>
 
-              <Field label="Discount (LKR)" t={t}>
+              <Field label="Discount (usd)" t={t}>
                 <input
                   type="number" min="0" step="0.01"
                   value={discountAmount}
@@ -416,7 +416,7 @@ export default function NewDealPage() {
               Fill in if the customer is placing a deposit/reservation. Leave blank to skip.
             </p>
             <div style={grid3}>
-              <Field label="Reservation Amount (LKR)" t={t}>
+              <Field label="Reservation Amount (usd)" t={t}>
                 <input
                   type="number" min="0" step="0.01"
                   value={reservationAmount}

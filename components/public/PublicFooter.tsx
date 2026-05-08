@@ -203,7 +203,7 @@ export default function PublicFooter() {
             color:       '#a0b0c0',
             margin:      0,
           }}>
-            Prices listed in LKR · Subject to change without notice
+            Prices listed in usd · Subject to change without notice
           </p>
         </div>
       </div>

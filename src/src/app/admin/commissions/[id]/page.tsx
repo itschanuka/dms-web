@@ -231,7 +231,7 @@ export default function CommissionDetailPage() {
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 12 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 12, color: t.muted, marginBottom: 6, fontWeight: 600 }}>New Amount (LKR)</label>
+                <label style={{ display: 'block', fontSize: 12, color: t.muted, marginBottom: 6, fontWeight: 600 }}>New Amount (usd)</label>
                 <input type="number" min="0" step="0.01" value={overrideAmt} onChange={e => setOverrideAmt(e.target.value)} style={inp} />
               </div>
               <div>

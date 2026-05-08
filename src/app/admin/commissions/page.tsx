@@ -352,7 +352,7 @@ function CommissionsContent() {
                     <span style={{ color: t.muted, fontSize: 12, textTransform: 'capitalize' }}>
                       {c.commission_type.replace(/_/g, ' ')}
                       {c.commission_rate ? ` (${c.commission_rate}%)` : ''}
-                      {c.fixed_value ? ` (LKR ${c.fixed_value})` : ''}
+                      {c.fixed_value ? ` (usd ${c.fixed_value})` : ''}
                     </span>
                   </td>
                   <td style={{ padding: '12px 14px', color: t.muted, fontFamily: 'monospace' }}>

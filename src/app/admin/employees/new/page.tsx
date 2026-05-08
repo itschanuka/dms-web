@@ -178,12 +178,12 @@ export default function NewEmployeePage() {
               <Field label="Commission Type" t={t}>
                 <select value={commType} onChange={e => setCommType(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
                   <option value="">— None —</option>
-                  <option value="fixed">Fixed Amount (LKR)</option>
+                  <option value="fixed">Fixed Amount (usd)</option>
                   <option value="percent_price">% of Selling Price</option>
                   <option value="percent_profit">% of Gross Profit</option>
                 </select>
               </Field>
-              <Field label={commType === 'fixed' ? 'Fixed Amount (LKR)' : 'Rate (%)'} t={t}>
+              <Field label={commType === 'fixed' ? 'Fixed Amount (usd)' : 'Rate (%)'} t={t}>
                 <input
                   type="number" min="0" step={commType === 'fixed' ? '1' : '0.01'}
                   value={commValue} onChange={e => setCommValue(e.target.value)}
@@ -196,7 +196,7 @@ export default function NewEmployeePage() {
             {commType && commValue && (
               <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 8, fontSize: 13, color: '#f97316' }}>
                 💸 {commType === 'fixed'
-                  ? `LKR ${commValue} flat per completed deal`
+                  ? `usd ${commValue} flat per completed deal`
                   : commType === 'percent_price'
                   ? `${commValue}% of selling price per completed deal`
                   : `${commValue}% of gross profit per completed deal`}

@@ -417,14 +417,14 @@ export default function EmployeeDetailPage() {
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: t.label, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Commission Type</label>
                 <select value={commType} onChange={e => setCommType(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
                   <option value="">— None —</option>
-                  <option value="fixed">Fixed Amount (LKR)</option>
+                  <option value="fixed">Fixed Amount (usd)</option>
                   <option value="percent_price">% of Selling Price</option>
                   <option value="percent_profit">% of Gross Profit</option>
                 </select>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: t.label, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
-                  {commType === 'fixed' ? 'Fixed Amount (LKR)' : 'Rate (%)'}
+                  {commType === 'fixed' ? 'Fixed Amount (usd)' : 'Rate (%)'}
                 </label>
                 <input type="number" min="0" step={commType === 'fixed' ? '1' : '0.01'}
                   value={commValue} onChange={e => setCommValue(e.target.value)}
@@ -435,7 +435,7 @@ export default function EmployeeDetailPage() {
             {commType && commValue && (
               <div style={{ padding: '12px 16px', background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 10, fontSize: 13, color: '#f97316', marginBottom: 20 }}>
                 💸 {commType === 'fixed'
-                  ? `LKR ${commValue} per deal`
+                  ? `usd ${commValue} per deal`
                   : commType === 'percent_price'
                   ? `${commValue}% of selling price`
                   : `${commValue}% of gross profit`}

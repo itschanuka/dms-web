@@ -314,7 +314,7 @@ export default function VehicleForm({ initial = {}, mode }: Props) {
               ]} />
             </Field>
             <Field label="Supplier / Source"><input className="vf-input" type="text" value={form.supplier_name} onChange={e => set('supplier_name', e.target.value)} placeholder="ABC Auctions" style={INPUT} /></Field>
-            <Field label="Purchase Price (LKR)" required><input className="vf-input" type="number" value={form.purchase_price} onChange={e => set('purchase_price', e.target.value)} placeholder="3200000" style={INPUT} /></Field>
+            <Field label="Purchase Price (usd)" required><input className="vf-input" type="number" value={form.purchase_price} onChange={e => set('purchase_price', e.target.value)} placeholder="3200000" style={INPUT} /></Field>
             <Field label="Payment Status" required>
               <SelectField value={form.purchase_payment_status} onChange={v => set('purchase_payment_status', v)} options={[
                 { value: 'paid',    label: 'Paid'    },
@@ -328,8 +328,8 @@ export default function VehicleForm({ initial = {}, mode }: Props) {
         {/* ── Section: Pricing ────────────────────────────── */}
         <Section title="Pricing">
           <Grid>
-            <Field label="Asking Price (LKR)" required><input className="vf-input" type="number" value={form.asking_price} onChange={e => set('asking_price', e.target.value)} placeholder="3950000" style={INPUT} /></Field>
-            <Field label="Minimum Price (LKR)"><input className="vf-input" type="number" value={form.minimum_price} onChange={e => set('minimum_price', e.target.value)} placeholder="3700000" style={INPUT} /></Field>
+            <Field label="Asking Price (usd)" required><input className="vf-input" type="number" value={form.asking_price} onChange={e => set('asking_price', e.target.value)} placeholder="3950000" style={INPUT} /></Field>
+            <Field label="Minimum Price (usd)"><input className="vf-input" type="number" value={form.minimum_price} onChange={e => set('minimum_price', e.target.value)} placeholder="3700000" style={INPUT} /></Field>
           </Grid>
           <div style={{ fontSize: 11, color: '#3d5272', marginTop: 10, display: 'flex', alignItems: 'center', gap: 7, padding: '8px 12px', background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.12)', borderRadius: 8 }}>
             ⚠️ Minimum price is confidential — only visible to Managers and Admins

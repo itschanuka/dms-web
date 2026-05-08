@@ -550,7 +550,7 @@ export default function DealDetailPage() {
                     <input type="date" value={pmtDate} onChange={e => setPmtDate(e.target.value)} style={inputSt} />
                   </div>
                   <div>
-                    <label style={labelSt}>Amount (LKR)</label>
+                    <label style={labelSt}>Amount (usd)</label>
                     <input type="number" value={pmtAmt} onChange={e => setPmtAmt(e.target.value)} placeholder="0.00" style={inputSt} />
                   </div>
                   <div>
@@ -652,7 +652,7 @@ export default function DealDetailPage() {
                 <p style={{ ...labelSt, color: '#f59e0b', marginBottom: 14 }}>Record Disbursement</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 12, alignItems: 'flex-end' }}>
                   <div>
-                    <label style={labelSt}>Amount (LKR)</label>
+                    <label style={labelSt}>Amount (usd)</label>
                     <input type="number" value={disbAmt} onChange={e => setDisbAmt(e.target.value)} placeholder="0.00" style={inputSt} />
                   </div>
                   <div>
@@ -863,7 +863,7 @@ export default function DealDetailPage() {
                   style={{ ...inputSt, resize: 'vertical', fontFamily: 'inherit' }} />
               </div>
               <div style={{ marginBottom: 20 }}>
-                <label style={labelSt}>Refund Amount (LKR)</label>
+                <label style={labelSt}>Refund Amount (usd)</label>
                 <input type="number" value={cancelRefund} onChange={e => setCancelRefund(e.target.value)} placeholder="0.00" style={inputSt} />
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>

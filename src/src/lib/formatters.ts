@@ -1,9 +1,9 @@
 /**
- * Format a number as LKR currency
- * e.g. 4500000 → "LKR 4,500,000"
+ * Format a number as usd currency
+ * e.g. 4500000 → "usd 4,500,000"
  */
 export function formatPrice(amount: number): string {
-  return `LKR ${amount.toLocaleString('en-LK')}`;
+  return `usd ${amount.toLocaleString('en-LK')}`;
 }
 
 /** Alias for formatPrice — use either name */

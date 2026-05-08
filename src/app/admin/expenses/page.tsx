@@ -129,7 +129,7 @@ export default function ExpensesPage() {
               <button key={cat} onClick={() => { setCategory(cat === category ? '' : cat); setPage(1); }}
                 style={{ background: cat === category ? `${CATEGORY_COLORS[cat]}33` : t.card, border: `1px solid ${cat === category ? CATEGORY_COLORS[cat] : t.border}`, borderRadius: 20, padding: '5px 14px', cursor: 'pointer', transition: 'all .15s' }}>
                 <span style={{ color: CATEGORY_COLORS[cat] ?? t.muted, fontWeight: 700, fontSize: 11, textTransform: 'capitalize' }}>{CATEGORY_LABELS[cat] ?? cat}</span>
-                <span style={{ color: t.text, fontWeight: 800, fontSize: 12, marginLeft: 8 }}>LKR {amt.toLocaleString()}</span>
+                <span style={{ color: t.text, fontWeight: 800, fontSize: 12, marginLeft: 8 }}>usd {amt.toLocaleString()}</span>
               </button>
             ))}
           </div>

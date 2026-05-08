@@ -113,7 +113,7 @@ export default function NewExpensePage() {
           {/* Amount + Date row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
-              <label style={label}>Amount (LKR) *</label>
+              <label style={label}>Amount (usd) *</label>
               <input type="number" min="0" step="0.01" value={amount}
                 onChange={e => setAmount(e.target.value)}
                 placeholder="0.00" style={inp} />
