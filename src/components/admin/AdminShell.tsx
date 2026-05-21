@@ -26,6 +26,7 @@ const MODULES: NavModule[] = [
   { href: '/admin/expenses',    icon: '💳', label: 'Expenses',    color: '#ef4444', group: 'core' },
   { href: '/admin/employees',   icon: '👥', label: 'Employees',   color: '#ec4899', group: 'core' },
   { href: '/admin/reports',     icon: '📈', label: 'Reports',     color: '#14b8a6', group: 'core' },
+  { href: '/admin/ai-assistant', icon: 'AI', label: 'AI Assistant', color: '#2563eb', group: 'core' },
   // System
   { href: '/admin/backups',     icon: '💾', label: 'Backups',     color: '#0ea5e9', group: 'system' },
   { href: '/admin/trash',       icon: '🗑️', label: 'Trash',       color: '#64748b', group: 'system' },
@@ -44,6 +45,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   expenses:    'Expenses',
   crm:         'CRM',
   backups:     'Backups',
+  'ai-assistant': 'AI Assistant',
 };
 
 interface Props {

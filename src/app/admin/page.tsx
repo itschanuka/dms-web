@@ -34,6 +34,7 @@ const MODULES = [
   { href: '/admin/customers', icon: '👤', label: 'Customers',  desc: 'Database & history',       color: '#f59e0b' },
   { href: '/admin/employees', icon: '👥', label: 'Employees',  desc: 'Staff & permissions',      color: '#8b5cf6' },
   { href: '/admin/reports',   icon: '📈', label: 'Reports',    desc: 'Analytics & exports',      color: '#ef4444' },
+  { href: '/admin/ai-assistant', icon: 'AI', label: 'AI Assistant', desc: 'Dealership intelligence', color: '#2563eb' },
 ];
 
 // ── Dashboard ─────────────────────────────────────────────────
